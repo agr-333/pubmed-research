@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PubMed Research &amp; Trends</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .anim-spin { animation: spin 1s linear infinite; }
+    @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .anim-pulse { animation: pulse2 1.5s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useCallback } = React;
+
+    /* ================================================================== */
+    /*  SVG Icons                                                         */
+    /* ================================================================== */
+    const SearchIcon = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    );
+    const FilterIcon = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+    );
+    const ChevronDownIcon = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    );
+    const ChevronUpIcon = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    );
+    const TrendingUpIcon = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    );
+    const BarChartIcon = ({ size = 24 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+    );
+    const FileTextIcon = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    );
+    const DownloadIcon = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    );
+    const ExternalLinkIcon = ({ size = 14 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    );
+    const SpinnerIcon = ({ size = 20 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="anim-spin"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" opacity="0.25"/><path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" opacity="0.75"/></svg>
+    );
+
+    /* ================================================================== */
+    /*  PubMed E-utilities API                                            */
+    /* ================================================================== */
+    const EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+
+    function buildSearchQuery(term, filters) {
+      let q = term;
+      if (filters.yearFrom || filters.yearTo) {
+        const from = filters.yearFrom || '1900';
+        const to   = filters.yearTo   || '3000';
+        q += `+AND+${from}:${to}[dp]`;
+      }
+      if (filters.articleType) {
+        q += `+AND+${encodeURIComponent(filters.articleType)}[pt]`;
+      }
+      if (filters.language) {
+        q += `+AND+${filters.language.toLowerCase()}[la]`;
+      }
+      return q;
+    }
+
+    async function searchPubMed(term, filters) {
+      const query = buildSearchQuery(term, filters);
+      const url = `${EUTILS}/esearch.fcgi?db=pubmed&retmode=json&retmax=20&usehistory=y&term=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Error en la busqueda');
+      const data = await res.json();
+      const ids = data.esearchresult?.idlist || [];
+      const count = parseInt(data.esearchresult?.count || '0');
+      if (ids.length === 0) return { articles: [], count };
+
+      const sumUrl = `${EUTILS}/esummary.fcgi?db=pubmed&retmode=json&id=${ids.join(',')}`;
+      const sumRes = await fetch(sumUrl);
+      if (!sumRes.ok) throw new Error('Error obteniendo detalles');
+      const sumData = await sumRes.json();
+      const result = sumData.result || {};
+
+      // Fetch abstracts via efetch XML
+      let abstractMap = {};
+      try {
+        const abUrl = `${EUTILS}/efetch.fcgi?db=pubmed&rettype=abstract&retmode=xml&id=${ids.join(',')}`;
+        const abRes = await fetch(abUrl);
+        const abText = await abRes.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(abText, 'text/xml');
+        const articles = xml.querySelectorAll('PubmedArticle');
+        articles.forEach(art => {
+          const pmid = art.querySelector('PMID')?.textContent || '';
+          const abTexts = art.querySelectorAll('AbstractText');
+          const ab = Array.from(abTexts).map(t => t.textContent).join(' ');
+          if (pmid && ab) abstractMap[pmid] = ab;
+        });
+      } catch {}
+
+      const articles = ids.map(id => {
+        const r = result[id];
+        if (!r || !r.uid) return null;
+        const authors = (r.authors || []).map(a => a.name).join(', ');
+        const pubTypes = (r.pubtype || []).join(', ');
+        const doi = (r.articleids || []).find(a => a.idtype === 'doi')?.value || '';
+        return {
+          pmid: r.uid,
+          title: r.title || '',
+          authors: authors || 'Unknown',
+          journal: r.fulljournalname || r.source || '',
+          year: (r.pubdate || '').split(' ')[0] || '',
+          abstract: abstractMap[r.uid] || '',
+          doi,
+          type: pubTypes
+        };
+      }).filter(Boolean);
+
+      return { articles, count };
+    }
+
+    /* ================================================================== */
+    /*  Trend Analysis via real PubMed counts                             */
+    /* ================================================================== */
+    async function fetchTrends(term) {
+      const currentYear = new Date().getFullYear();
+      const years = [];
+      for (let y = currentYear; y >= currentYear - 9; y--) years.push(y);
+
+      // Fetch counts per year in parallel
+      const yearCounts = await Promise.all(
+        years.map(async (y) => {
+          const url = `${EUTILS}/esearch.fcgi?db=pubmed&retmode=json&rettype=count&term=${encodeURIComponent(term)}+AND+${y}[dp]`;
+          try {
+            const res = await fetch(url);
+            const data = await res.json();
+            return { year: y, count: parseInt(data.esearchresult?.count || '0') };
+          } catch { return { year: y, count: 0 }; }
+        })
+      );
+
+      // Fetch a sample of recent articles to extract journals and article types
+      const sampleUrl = `${EUTILS}/esearch.fcgi?db=pubmed&retmode=json&retmax=100&term=${encodeURIComponent(term)}&sort=date`;
+      const sampleRes = await fetch(sampleUrl);
+      const sampleData = await sampleRes.json();
+      const sampleIds = sampleData.esearchresult?.idlist || [];
+
+      let journals = {}, types = {}, authorCounts = {};
+
+      if (sampleIds.length > 0) {
+        const sumUrl = `${EUTILS}/esummary.fcgi?db=pubmed&retmode=json&id=${sampleIds.join(',')}`;
+        const sumRes = await fetch(sumUrl);
+        const sumData = await sumRes.json();
+        const result = sumData.result || {};
+
+        sampleIds.forEach(id => {
+          const r = result[id];
+          if (!r || !r.uid) return;
+
+          const journal = r.fulljournalname || r.source || '';
+          if (journal) journals[journal] = (journals[journal] || 0) + 1;
+
+          (r.pubtype || []).forEach(t => { types[t] = (types[t] || 0) + 1; });
+
+          (r.authors || []).slice(0, 3).forEach(a => {
+            if (a.name) authorCounts[a.name] = (authorCounts[a.name] || 0) + 1;
+          });
+        });
+      }
+
+      // Sort and pick top items
+      const topJournals = Object.entries(journals)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ area: name, percentage: Math.round((count / Math.max(sampleIds.length, 1)) * 100) }));
+
+      const topAuthors = Object.entries(authorCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ name, publications: count, institution: '' }));
+
+      const topTypes = Object.entries(types)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ trend: name, count }));
+
+      // Compute growth trends
+      const sorted = [...yearCounts].sort((a, b) => b.year - a.year);
+      const totalCount = parseInt(sampleData.esearchresult?.count || '0');
+
+      let growth = 'N/A';
+      if (sorted.length >= 2 && sorted[1].count > 0) {
+        const pct = Math.round(((sorted[0].count - sorted[1].count) / sorted[1].count) * 100);
+        growth = (pct >= 0 ? '+' : '') + pct + '%';
+      }
+
+      const emergingTrends = topTypes.map(t => ({
+        trend: t.trend,
+        growth: `${t.count} articulos recientes`
+      }));
+
+      return {
+        summary: `Se encontraron ${totalCount.toLocaleString()} articulos sobre "${term}" en PubMed. La produccion cientifica de los ultimos ${years.length} anos muestra la evolucion temporal a continuacion.`,
+        publicationsByYear: sorted,
+        topAreas: topJournals,
+        topAuthors,
+        emergingTrends,
+        yearGrowth: growth,
+        totalCount
+      };
+    }
+
+    /* ================================================================== */
+    /*  Citation Generator                                                */
+    /* ================================================================== */
+    function generateCitation(article, format) {
+      const firstAuthor = (article.authors || '').split(',')[0].trim();
+      const authors = firstAuthor + (article.authors.includes(',') ? ' et al.' : '');
+      const doiLink = article.doi ? `https://doi.org/${article.doi}` : `PMID: ${article.pmid}`;
+
+      if (format === 'APA') {
+        return `${authors} (${article.year}). ${article.title} ${article.journal}. ${doiLink}`;
+      } else if (format === 'Vancouver') {
+        return `${authors}. ${article.title} ${article.journal}. ${article.year}. PMID: ${article.pmid}.`;
+      } else {
+        return `${authors}. "${article.title}" ${article.journal} (${article.year}).`;
+      }
+    }
+
+    /* ================================================================== */
+    /*  App Component                                                     */
+    /* ================================================================== */
+    function PubMedTool() {
+      const [searchTerm, setSearchTerm]       = useState('');
+      const [filters, setFilters]             = useState({ yearFrom: '', yearTo: '', articleType: '', language: '' });
+      const [showFilters, setShowFilters]     = useState(false);
+      const [searchResults, setSearchResults] = useState([]);
+      const [totalCount, setTotalCount]       = useState(0);
+      const [isSearching, setIsSearching]     = useState(false);
+      const [error, setError]                 = useState('');
+      const [selectedArticles, setSelectedArticles] = useState([]);
+      const [activeTab, setActiveTab]         = useState('search');
+      const [trendData, setTrendData]         = useState(null);
+      const [isAnalyzing, setIsAnalyzing]     = useState(false);
+      const [showExport, setShowExport]       = useState(false);
+      const [exportFormat, setExportFormat]   = useState('APA');
+      const [expandedAbstract, setExpandedAbstract] = useState(null);
+
+      const handleSearch = useCallback(async () => {
+        if (!searchTerm.trim()) { setError('Introduce un termino de busqueda'); return; }
+        setIsSearching(true); setError(''); setActiveTab('search');
+        try {
+          const { articles, count } = await searchPubMed(searchTerm, filters);
+          setSearchResults(articles);
+          setTotalCount(count);
+          if (articles.length === 0) setError('No se encontraron resultados');
+        } catch (err) {
+          setError('Error en la busqueda: ' + err.message);
+          setSearchResults([]);
+        } finally { setIsSearching(false); }
+      }, [searchTerm, filters]);
+
+      const analyzeTrends = useCallback(async () => {
+        if (!searchTerm.trim()) { setError('Introduce un termino de busqueda primero'); return; }
+        setIsAnalyzing(true); setError(''); setActiveTab('trends');
+        try {
+          const data = await fetchTrends(searchTerm);
+          setTrendData(data);
+        } catch (err) {
+          setError('Error al analizar tendencias: ' + err.message);
+        } finally { setIsAnalyzing(false); }
+      }, [searchTerm]);
+
+      const toggleSelection = (article) => {
+        setSelectedArticles(prev =>
+          prev.find(a => a.pmid === article.pmid)
+            ? prev.filter(a => a.pmid !== article.pmid)
+            : [...prev, article]
+        );
+      };
+
+      const downloadBibliography = () => {
+        const content = selectedArticles.map(a => generateCitation(a, exportFormat)).join('\n\n');
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `bibliografia_${exportFormat}.txt`; a.click();
+        URL.revokeObjectURL(url);
+        setShowExport(false);
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-50 p-4">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-1">PubMed Research &amp; Trends</h1>
+                  <p className="text-gray-600">Busca literatura cientifica real y analiza tendencias de investigacion</p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-xs font-medium text-green-700">Conectado a PubMed / NCBI</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Sidebar */}
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-lg shadow p-4 sticky top-4">
+                  <h2 className="text-lg font-semibold mb-3">Seleccionados ({selectedArticles.length})</h2>
+                  {selectedArticles.length === 0 ? (
+                    <p className="text-sm text-gray-500">Haz clic en un articulo para seleccionarlo</p>
+                  ) : (
+                    <>
+                      <div className="space-y-2 mb-4 max-h-80 overflow-y-auto">
+                        {selectedArticles.map(article => (
+                          <div key={article.pmid} className="text-sm p-2 bg-blue-50 rounded group relative">
+                            <div className="font-medium text-blue-900">PMID: {article.pmid}</div>
+                            <div className="text-xs text-gray-600 line-clamp-2">{article.title}</div>
+                            <button onClick={(e) => { e.stopPropagation(); toggleSelection(article); }}
+                              className="absolute top-1 right-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs p-1">
+                              &times;
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={() => setShowExport(true)}
+                        className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+                        <FileTextIcon size={18} /> Exportar Bibliografia
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Main Content */}
+              <div className="lg:col-span-3">
+                {/* Search Bar */}
+                <div className="bg-white rounded-lg shadow p-6 mb-6">
+                  <div className="flex gap-3 mb-4 flex-wrap">
+                    <input type="text" placeholder="Buscar articulos (ej: diabetes, cancer, COVID-19)..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="flex-1 min-w-[200px] border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onClick={handleSearch} disabled={isSearching}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition flex items-center gap-2 font-medium">
+                      {isSearching ? <SpinnerIcon size={18} /> : <SearchIcon size={18} />}
+                      {isSearching ? 'Buscando...' : 'Buscar'}
+                    </button>
+                    <button onClick={analyzeTrends} disabled={isAnalyzing}
+                      className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center gap-2 transition font-medium">
+                      {isAnalyzing ? <SpinnerIcon size={18} /> : <TrendingUpIcon size={18} />}
+                      Tendencias
+                    </button>
+                  </div>
+
+                  <button onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-gray-900 text-sm">
+                    <FilterIcon size={16} /> Filtros avanzados
+                    {showFilters ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
+                  </button>
+
+                  {showFilters && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ano desde</label>
+                        <input type="number" placeholder="2020" value={filters.yearFrom}
+                          onChange={(e) => setFilters({...filters, yearFrom: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ano hasta</label>
+                        <input type="number" placeholder="2025" value={filters.yearTo}
+                          onChange={(e) => setFilters({...filters, yearTo: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de articulo</label>
+                        <select value={filters.articleType} onChange={(e) => setFilters({...filters, articleType: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                          <option value="">Todos</option>
+                          <option value="Clinical Trial">Ensayo Clinico</option>
+                          <option value="Meta-Analysis">Meta-analisis</option>
+                          <option value="Review">Revision</option>
+                          <option value="Systematic Review">Revision Sistematica</option>
+                          <option value="Randomized Controlled Trial">Ensayo Controlado Aleatorio</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Idioma</label>
+                        <select value={filters.language} onChange={(e) => setFilters({...filters, language: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                          <option value="">Todos</option>
+                          <option value="English">Ingles</option>
+                          <option value="Spanish">Espanol</option>
+                          <option value="French">Frances</option>
+                          <option value="German">Aleman</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Error */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <p className="text-red-800">{error}</p>
+                  </div>
+                )}
+
+                {/* Tabs */}
+                <div className="mb-4 flex gap-1 border-b">
+                  <button onClick={() => setActiveTab('search')}
+                    className={`px-4 py-2.5 font-medium text-sm transition ${activeTab === 'search' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}>
+                    Resultados {totalCount > 0 && `(${totalCount.toLocaleString()})`}
+                  </button>
+                  <button onClick={() => setActiveTab('trends')}
+                    className={`px-4 py-2.5 font-medium text-sm transition ${activeTab === 'trends' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}>
+                    Analisis de Tendencias
+                  </button>
+                </div>
+
+                {/* ---- Search Results Tab ---- */}
+                {activeTab === 'search' && (
+                  <div className="space-y-3">
+                    {isSearching ? (
+                      <div className="bg-white rounded-lg shadow p-6">
+                        {[1,2,3,4,5].map(i => (
+                          <div key={i} className="mb-4 space-y-2">
+                            <div className="h-4 w-3/4 bg-gray-200 rounded anim-pulse"></div>
+                            <div className="h-3 w-1/2 bg-gray-200 rounded anim-pulse"></div>
+                            <div className="h-3 w-1/3 bg-gray-200 rounded anim-pulse"></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="bg-white rounded-lg shadow p-6 text-center py-20 text-gray-500">
+                        <SearchIcon size={48} />
+                        <p className="mt-4">Introduce un termino de busqueda para encontrar articulos cientificos en PubMed</p>
+                      </div>
+                    ) : (
+                      searchResults.map(article => {
+                        const isSelected = !!selectedArticles.find(a => a.pmid === article.pmid);
+                        const isExpanded = expandedAbstract === article.pmid;
+                        return (
+                          <div key={article.pmid}
+                            className={`bg-white rounded-lg shadow p-5 border-l-4 transition cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-50/30' : 'border-transparent hover:border-gray-300'}`}
+                            onClick={() => toggleSelection(article)}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex-1 pr-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-mono font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">PMID: {article.pmid}</span>
+                                  <span className="text-xs text-gray-500">{article.year}</span>
+                                  {article.type && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{article.type}</span>}
+                                </div>
+                                <h3 className="font-medium text-gray-900 leading-snug">{article.title}</h3>
+                              </div>
+                              <input type="checkbox" checked={isSelected} readOnly
+                                className="h-5 w-5 text-blue-600 rounded mt-1 flex-shrink-0 pointer-events-none" />
+                            </div>
+                            <div className="text-sm text-gray-600 space-y-1 mb-2">
+                              <p><span className="font-medium">Autores:</span> {article.authors}</p>
+                              <p><span className="font-medium">Revista:</span> {article.journal}</p>
+                            </div>
+                            {article.abstract && (
+                              <div className="mt-2 border-t pt-2">
+                                <button onClick={(e) => { e.stopPropagation(); setExpandedAbstract(isExpanded ? null : article.pmid); }}
+                                  className="text-xs text-blue-600 hover:underline mb-1">
+                                  {isExpanded ? 'Ocultar resumen' : 'Ver resumen'}
+                                </button>
+                                {isExpanded && <p className="text-sm text-gray-600 leading-relaxed">{article.abstract}</p>}
+                              </div>
+                            )}
+                            <div className="flex gap-3 mt-2">
+                              {article.doi && (
+                                <a href={`https://doi.org/${article.doi}`} target="_blank" rel="noopener noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                  DOI <ExternalLinkIcon size={12} />
+                                </a>
+                              )}
+                              <a href={`https://pubmed.ncbi.nlm.nih.gov/${article.pmid}/`} target="_blank" rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                PubMed <ExternalLinkIcon size={12} />
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* ---- Trends Tab ---- */}
+                {activeTab === 'trends' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                      <BarChartIcon size={24} /> Analisis de Tendencias Cientificas
+                    </h2>
+
+                    {isAnalyzing ? (
+                      <div className="text-center py-20">
+                        <SpinnerIcon size={32} />
+                        <p className="mt-4 text-gray-500">Consultando PubMed para analizar tendencias...</p>
+                      </div>
+                    ) : !trendData ? (
+                      <div className="text-center py-20 text-gray-500">
+                        <TrendingUpIcon size={48} />
+                        <p className="mt-4">Haz clic en "Tendencias" para analizar la produccion cientifica</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-8">
+                        {/* Summary */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <h3 className="font-semibold text-blue-900 mb-2">Resumen</h3>
+                          <p className="text-blue-800 text-sm">{trendData.summary}</p>
+                          {trendData.yearGrowth && (
+                            <p className="mt-2 text-sm font-medium text-blue-700">
+                              Crecimiento interanual: <span className={trendData.yearGrowth.startsWith('+') ? 'text-green-700' : 'text-red-600'}>{trendData.yearGrowth}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Publications by Year */}
+                        {trendData.publicationsByYear && (
+                          <div>
+                            <h3 className="font-semibold text-gray-900 mb-3">Publicaciones por Ano</h3>
+                            <div className="space-y-2">
+                              {trendData.publicationsByYear.map(item => {
+                                const max = Math.max(...trendData.publicationsByYear.map(i => i.count), 1);
+                                const pct = (item.count / max) * 100;
+                                return (
+                                  <div key={item.year} className="flex items-center gap-3">
+                                    <div className="w-12 text-sm text-gray-600 font-mono font-medium">{item.year}</div>
+                                    <div className="flex-1 bg-gray-100 rounded-full h-8 relative">
+                                      <div className="bg-blue-600 h-8 rounded-full flex items-center justify-end pr-3 transition-all duration-500"
+                                        style={{ width: `${Math.max(pct, 3)}%` }}>
+                                        {pct > 15 && <span className="text-white text-xs font-medium">{item.count.toLocaleString()}</span>}
+                                      </div>
+                                      {pct <= 15 && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-600">{item.count.toLocaleString()}</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Top Journals */}
+                        {trendData.topAreas?.length > 0 && (
+                          <div>
+                            <h3 className="font-semibold text-gray-900 mb-3">Revistas Principales (muestra reciente)</h3>
+                            <div className="grid gap-2">
+                              {trendData.topAreas.map((area, idx) => (
+                                <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                  <span className="text-sm text-gray-900">{area.area}</span>
+                                  <span className="text-blue-600 font-semibold text-sm">{area.percentage}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Top Authors */}
+                        {trendData.topAuthors?.length > 0 && (
+                          <div>
+                            <h3 className="font-semibold text-gray-900 mb-3">Autores Frecuentes (muestra reciente)</h3>
+                            <div className="space-y-2">
+                              {trendData.topAuthors.map((author, idx) => (
+                                <div key={idx} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
+                                  <span className="font-medium text-gray-900 text-sm">{author.name}</span>
+                                  <span className="text-sm text-blue-600 font-medium">{author.publications} art.</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Article Types */}
+                        {trendData.emergingTrends?.length > 0 && (
+                          <div>
+                            <h3 className="font-semibold text-gray-900 mb-3">Tipos de Publicacion</h3>
+                            <div className="space-y-2">
+                              {trendData.emergingTrends.map((trend, idx) => (
+                                <div key={idx} className="p-3 bg-green-50 border border-green-200 rounded-lg flex justify-between items-center">
+                                  <span className="text-sm text-gray-900">{trend.trend}</span>
+                                  <span className="text-sm text-green-700 font-medium">{trend.growth}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Export Dialog */}
+          {showExport && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowExport(false)}>
+              <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+                <h3 className="text-xl font-semibold mb-4">Exportar Bibliografia</h3>
+
+                <div className="mb-4">
+                  <h4 className="font-medium mb-2 text-sm">Formato de citacion:</h4>
+                  <div className="flex gap-4">
+                    {['APA', 'Vancouver', 'MLA'].map(format => (
+                      <label key={format} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${exportFormat === format ? 'bg-blue-50 border-blue-300' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <input type="radio" name="format" checked={exportFormat === format}
+                          onChange={() => setExportFormat(format)} className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">{format}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <h4 className="font-medium mb-2 text-sm">Vista previa ({selectedArticles.length} articulos):</h4>
+                  <pre className="bg-gray-50 p-4 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap max-h-72 border">
+                    {selectedArticles.map(a => generateCitation(a, exportFormat)).join('\n\n')}
+                  </pre>
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={downloadBibliography}
+                    className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+                    <DownloadIcon size={18} /> Descargar .txt
+                  </button>
+                  <button onClick={() => {
+                    const text = selectedArticles.map(a => generateCitation(a, exportFormat)).join('\n\n');
+                    navigator.clipboard.writeText(text);
+                  }}
+                    className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg hover:bg-gray-200 font-medium">
+                    Copiar al portapapeles
+                  </button>
+                  <button onClick={() => setShowExport(false)}
+                    className="px-6 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 font-medium">
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<PubMedTool />);
+  </script>
+</body>
+</html>
