@@ -269,11 +269,11 @@
       }
 
       var emergingTrends = topTypes.map(function(t) {
-        return { trend: t[0], growth: t[1] + ' art\u00edculos recientes' };
+        return { trend: t[0], growth: t[1] + ' artículos recientes' };
       });
 
       return {
-        summary: 'Se encontraron ' + totalCount.toLocaleString() + ' art\u00edculos sobre "' + term + '" en PubMed. La producci\u00f3n cient\u00edfica de los \u00faltimos ' + years.length + ' a\u00f1os muestra la evoluci\u00f3n temporal a continuaci\u00f3n.',
+        summary: 'Se encontraron ' + totalCount.toLocaleString() + ' artículos sobre "' + term + '" en PubMed. La producción científica de los últimos ' + years.length + ' años muestra la evolución temporal a continuación.',
         publicationsByYear: sorted,
         topAreas: topJournals,
         topAuthors: topAuthors,
@@ -337,7 +337,7 @@
       }, []);
 
       var handleSearch = function() {
-        if (!searchTerm.trim()) { setError('Introduce un t\u00e9rmino de b\u00fasqueda'); return; }
+        if (!searchTerm.trim()) { setError('Introduce un término de búsqueda'); return; }
         setIsSearching(true); setError(''); setActiveTab('search');
         searchPubMed(searchTerm, filters)
           .then(function(data) {
@@ -349,14 +349,14 @@
           })
           .catch(function(err) {
             console.error('[App] Search error:', err);
-            setError('Error en la b\u00fasqueda: ' + err.message);
+            setError('Error en la búsqueda: ' + err.message);
             setSearchResults([]);
           })
           .finally(function() { setIsSearching(false); });
       };
 
       var analyzeTrends = function() {
-        if (!searchTerm.trim()) { setError('Introduce un t\u00e9rmino de b\u00fasqueda primero'); return; }
+        if (!searchTerm.trim()) { setError('Introduce un término de búsqueda primero'); return; }
         setIsAnalyzing(true); setError(''); setActiveTab('trends');
         fetchTrends(searchTerm)
           .then(function(data) {
@@ -396,7 +396,7 @@
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 mb-1">PubMed Research &amp; Trends</h1>
-                  <p className="text-gray-600">Busca literatura cient\u00edfica real y analiza tendencias de investigaci\u00f3n</p>
+                  <p className="text-gray-600">Busca literatura científica real y analiza tendencias de investigación</p>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -411,7 +411,7 @@
                 <div className="bg-white rounded-lg shadow p-4 sticky top-4">
                   <h2 className="text-lg font-semibold mb-3">Seleccionados ({selectedArticles.length})</h2>
                   {selectedArticles.length === 0 ? (
-                    <p className="text-sm text-gray-500">Haz clic en un art\u00edculo para seleccionarlo</p>
+                    <p className="text-sm text-gray-500">Haz clic en un artículo para seleccionarlo</p>
                   ) : (
                     <>
                       <div className="space-y-2 mb-4 max-h-80 overflow-y-auto">
@@ -428,7 +428,7 @@
                       </div>
                       <button onClick={() => setShowExport(true)}
                         className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
-                        <FileTextIcon size={18} /> Exportar Bibliograf\u00eda
+                        <FileTextIcon size={18} /> Exportar Bibliografía
                       </button>
                     </>
                   )}
@@ -440,7 +440,7 @@
                 {/* Search Bar */}
                 <div className="bg-white rounded-lg shadow p-6 mb-6">
                   <div className="flex gap-3 mb-4 flex-wrap">
-                    <input type="text" placeholder="Buscar art\u00edculos (ej: diabetes, cancer, COVID-19)..."
+                    <input type="text" placeholder="Buscar artículos (ej: diabetes, cancer, COVID-19)..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -466,26 +466,26 @@
                   {showFilters && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">A\u00f1o desde</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Año desde</label>
                         <input type="number" placeholder="2020" value={filters.yearFrom}
                           onChange={(e) => setFilters({...filters, yearFrom: e.target.value})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">A\u00f1o hasta</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Año hasta</label>
                         <input type="number" placeholder="2025" value={filters.yearTo}
                           onChange={(e) => setFilters({...filters, yearTo: e.target.value})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de art\u00edculo</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de artículo</label>
                         <select value={filters.articleType} onChange={(e) => setFilters({...filters, articleType: e.target.value})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                           <option value="">Todos</option>
-                          <option value="Clinical Trial">Ensayo Cl\u00ednico</option>
-                          <option value="Meta-Analysis">Meta-an\u00e1lisis</option>
-                          <option value="Review">Revisi\u00f3n</option>
-                          <option value="Systematic Review">Revisi\u00f3n Sistem\u00e1tica</option>
+                          <option value="Clinical Trial">Ensayo Clínico</option>
+                          <option value="Meta-Analysis">Meta-análisis</option>
+                          <option value="Review">Revisión</option>
+                          <option value="Systematic Review">Revisión Sistemática</option>
                           <option value="Randomized Controlled Trial">Ensayo Controlado Aleatorio</option>
                         </select>
                       </div>
@@ -495,7 +495,7 @@
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                           <option value="">Todos</option>
                           <option value="English">Ingles</option>
-                          <option value="Spanish">Espa\u00f1ol</option>
+                          <option value="Spanish">Español</option>
                           <option value="French">Frances</option>
                           <option value="German">Aleman</option>
                         </select>
@@ -519,7 +519,7 @@
                   </button>
                   <button onClick={() => setActiveTab('trends')}
                     className={`px-4 py-2.5 font-medium text-sm transition ${activeTab === 'trends' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}>
-                    An\u00e1lisis de Tendencias
+                    Análisis de Tendencias
                   </button>
                 </div>
 
@@ -539,7 +539,7 @@
                     ) : searchResults.length === 0 ? (
                       <div className="bg-white rounded-lg shadow p-6 text-center py-20 text-gray-500">
                         <SearchIcon size={48} />
-                        <p className="mt-4">Introduce un t\u00e9rmino de b\u00fasqueda para encontrar art\u00edculos cient\u00edficos en PubMed</p>
+                        <p className="mt-4">Introduce un término de búsqueda para encontrar artículos científicos en PubMed</p>
                       </div>
                     ) : (
                       searchResults.map(article => {
@@ -599,7 +599,7 @@
                 {activeTab === 'trends' && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                      <BarChartIcon size={24} /> An\u00e1lisis de Tendencias Cient\u00edficas
+                      <BarChartIcon size={24} /> Análisis de Tendencias Científicas
                     </h2>
 
                     {isAnalyzing ? (
@@ -610,7 +610,7 @@
                     ) : !trendData ? (
                       <div className="text-center py-20 text-gray-500">
                         <TrendingUpIcon size={48} />
-                        <p className="mt-4">Haz clic en "Tendencias" para analizar la producci\u00f3n cient\u00edfica</p>
+                        <p className="mt-4">Haz clic en "Tendencias" para analizar la producción científica</p>
                       </div>
                     ) : (
                       <div className="space-y-8">
@@ -628,7 +628,7 @@
                         {/* Publications by Year */}
                         {trendData.publicationsByYear && (
                           <div>
-                            <h3 className="font-semibold text-gray-900 mb-3">Publicaciones por A\u00f1o</h3>
+                            <h3 className="font-semibold text-gray-900 mb-3">Publicaciones por Año</h3>
                             <div className="space-y-2">
                               {trendData.publicationsByYear.map(item => {
                                 const max = Math.max(...trendData.publicationsByYear.map(i => i.count), 1);
@@ -706,10 +706,10 @@
           {showExport && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowExport(false)}>
               <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-                <h3 className="text-xl font-semibold mb-4">Exportar Bibliograf\u00eda</h3>
+                <h3 className="text-xl font-semibold mb-4">Exportar Bibliografía</h3>
 
                 <div className="mb-4">
-                  <h4 className="font-medium mb-2 text-sm">Formato de citaci\u00f3n:</h4>
+                  <h4 className="font-medium mb-2 text-sm">Formato de citación:</h4>
                   <div className="flex gap-4">
                     {['APA', 'Vancouver', 'MLA'].map(format => (
                       <label key={format} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${exportFormat === format ? 'bg-blue-50 border-blue-300' : 'border-gray-200 hover:bg-gray-50'}`}>
@@ -722,7 +722,7 @@
                 </div>
 
                 <div className="mb-4">
-                  <h4 className="font-medium mb-2 text-sm">Vista previa ({selectedArticles.length} art\u00edculos):</h4>
+                  <h4 className="font-medium mb-2 text-sm">Vista previa ({selectedArticles.length} artículos):</h4>
                   <pre className="bg-gray-50 p-4 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap max-h-72 border">
                     {selectedArticles.map(a => generateCitation(a, exportFormat)).join('\n\n')}
                   </pre>
