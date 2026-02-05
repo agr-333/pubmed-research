@@ -19,7 +19,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useCallback } = React;
+    const { useState, useCallback, useEffect, useRef } = React;
 
     /* ================================================================== */
     /*  SVG Icons                                                         */
@@ -59,165 +59,227 @@
     /*  PubMed E-utilities API                                            */
     /* ================================================================== */
     const EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+    const TOOL   = 'pubmed_research_app';
 
-    function buildSearchQuery(term, filters) {
-      let q = term;
+    function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+    function buildSearchTerm(term, filters) {
+      var parts = [term];
       if (filters.yearFrom || filters.yearTo) {
-        const from = filters.yearFrom || '1900';
-        const to   = filters.yearTo   || '3000';
-        q += `+AND+${from}:${to}[dp]`;
+        var from = filters.yearFrom || '1900';
+        var to   = filters.yearTo   || '3000';
+        parts.push(from + ':' + to + '[dp]');
       }
       if (filters.articleType) {
-        q += `+AND+${encodeURIComponent(filters.articleType)}[pt]`;
+        parts.push('"' + filters.articleType + '"[pt]');
       }
       if (filters.language) {
-        q += `+AND+${filters.language.toLowerCase()}[la]`;
+        parts.push(filters.language.toLowerCase() + '[la]');
       }
-      return q;
+      return parts.join(' AND ');
+    }
+
+    async function fetchJSON(url) {
+      var res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + url.split('?')[0]);
+      var text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error('Failed to parse JSON from', url.split('?')[0], text.substring(0, 200));
+        throw new Error('Invalid JSON response');
+      }
     }
 
     async function searchPubMed(term, filters) {
-      const query = buildSearchQuery(term, filters);
-      const url = `${EUTILS}/esearch.fcgi?db=pubmed&retmode=json&retmax=20&usehistory=y&term=${encodeURIComponent(query)}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Error en la busqueda');
-      const data = await res.json();
-      const ids = data.esearchresult?.idlist || [];
-      const count = parseInt(data.esearchresult?.count || '0');
-      if (ids.length === 0) return { articles: [], count };
+      // Step 1: Search for IDs
+      var searchTerm = buildSearchTerm(term, filters);
+      var searchParams = new URLSearchParams({
+        db: 'pubmed', retmode: 'json', retmax: '20', tool: TOOL, term: searchTerm
+      });
+      var searchUrl = EUTILS + '/esearch.fcgi?' + searchParams.toString();
+      console.log('[PubMed] Search URL:', searchUrl);
 
-      const sumUrl = `${EUTILS}/esummary.fcgi?db=pubmed&retmode=json&id=${ids.join(',')}`;
-      const sumRes = await fetch(sumUrl);
-      if (!sumRes.ok) throw new Error('Error obteniendo detalles');
-      const sumData = await sumRes.json();
-      const result = sumData.result || {};
+      var searchData = await fetchJSON(searchUrl);
+      var esearch = searchData.esearchresult || {};
+      var ids = esearch.idlist || [];
+      var count = parseInt(esearch.count || '0', 10);
+      console.log('[PubMed] Found', count, 'results,', ids.length, 'IDs returned');
 
-      // Fetch abstracts via efetch XML
-      let abstractMap = {};
-      try {
-        const abUrl = `${EUTILS}/efetch.fcgi?db=pubmed&rettype=abstract&retmode=xml&id=${ids.join(',')}`;
-        const abRes = await fetch(abUrl);
-        const abText = await abRes.text();
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(abText, 'text/xml');
-        const articles = xml.querySelectorAll('PubmedArticle');
-        articles.forEach(art => {
-          const pmid = art.querySelector('PMID')?.textContent || '';
-          const abTexts = art.querySelectorAll('AbstractText');
-          const ab = Array.from(abTexts).map(t => t.textContent).join(' ');
-          if (pmid && ab) abstractMap[pmid] = ab;
-        });
-      } catch {}
+      if (ids.length === 0) return { articles: [], count: count };
 
-      const articles = ids.map(id => {
-        const r = result[id];
-        if (!r || !r.uid) return null;
-        const authors = (r.authors || []).map(a => a.name).join(', ');
-        const pubTypes = (r.pubtype || []).join(', ');
-        const doi = (r.articleids || []).find(a => a.idtype === 'doi')?.value || '';
-        return {
-          pmid: r.uid,
-          title: r.title || '',
+      // Step 2: Get summaries
+      await delay(350);
+      var sumParams = new URLSearchParams({
+        db: 'pubmed', retmode: 'json', tool: TOOL, id: ids.join(',')
+      });
+      var sumUrl = EUTILS + '/esummary.fcgi?' + sumParams.toString();
+      console.log('[PubMed] Summary URL:', sumUrl);
+
+      var sumData = await fetchJSON(sumUrl);
+      var result = sumData.result || {};
+      console.log('[PubMed] Summary keys:', Object.keys(result).length);
+
+      // Step 3: Build articles from summaries
+      var articles = [];
+      for (var i = 0; i < ids.length; i++) {
+        var id = ids[i];
+        var r = result[id];
+        if (!r) { console.warn('[PubMed] No summary for ID', id); continue; }
+        var authors = (r.authors || []).map(function(a) { return a.name; }).join(', ');
+        var pubTypes = (r.pubtype || []).join(', ');
+        var doi = '';
+        var articleids = r.articleids || [];
+        for (var j = 0; j < articleids.length; j++) {
+          if (articleids[j].idtype === 'doi') { doi = articleids[j].value; break; }
+        }
+        articles.push({
+          pmid: r.uid || id,
+          title: r.title || 'Sin titulo',
           authors: authors || 'Unknown',
           journal: r.fulljournalname || r.source || '',
           year: (r.pubdate || '').split(' ')[0] || '',
-          abstract: abstractMap[r.uid] || '',
-          doi,
+          abstract: '',
+          doi: doi,
           type: pubTypes
-        };
-      }).filter(Boolean);
+        });
+      }
+      console.log('[PubMed] Parsed', articles.length, 'articles');
 
-      return { articles, count };
+      // Step 4: Fetch abstracts in background (non-blocking)
+      delay(350).then(function() {
+        var abParams = new URLSearchParams({
+          db: 'pubmed', rettype: 'abstract', retmode: 'xml', tool: TOOL, id: ids.join(',')
+        });
+        return fetch(EUTILS + '/efetch.fcgi?' + abParams.toString());
+      }).then(function(res) {
+        return res.text();
+      }).then(function(xmlText) {
+        var parser = new DOMParser();
+        var xml = parser.parseFromString(xmlText, 'text/xml');
+        var pubArticles = xml.querySelectorAll('PubmedArticle');
+        var abstractMap = {};
+        for (var k = 0; k < pubArticles.length; k++) {
+          var art = pubArticles[k];
+          var pmidEl = art.querySelector('PMID');
+          var pmid = pmidEl ? pmidEl.textContent : '';
+          var abTexts = art.querySelectorAll('AbstractText');
+          var ab = '';
+          for (var m = 0; m < abTexts.length; m++) ab += (ab ? ' ' : '') + abTexts[m].textContent;
+          if (pmid && ab) abstractMap[pmid] = ab;
+        }
+        // Update articles with abstracts via event
+        window.dispatchEvent(new CustomEvent('pubmed-abstracts', { detail: abstractMap }));
+        console.log('[PubMed] Loaded', Object.keys(abstractMap).length, 'abstracts');
+      }).catch(function(e) {
+        console.warn('[PubMed] Abstract fetch failed (non-critical):', e.message);
+      });
+
+      return { articles: articles, count: count };
     }
 
     /* ================================================================== */
     /*  Trend Analysis via real PubMed counts                             */
     /* ================================================================== */
     async function fetchTrends(term) {
-      const currentYear = new Date().getFullYear();
-      const years = [];
-      for (let y = currentYear; y >= currentYear - 9; y--) years.push(y);
+      var currentYear = new Date().getFullYear();
+      var years = [];
+      for (var y = currentYear; y >= currentYear - 9; y--) years.push(y);
 
-      // Fetch counts per year in parallel
-      const yearCounts = await Promise.all(
-        years.map(async (y) => {
-          const url = `${EUTILS}/esearch.fcgi?db=pubmed&retmode=json&rettype=count&term=${encodeURIComponent(term)}+AND+${y}[dp]`;
-          try {
-            const res = await fetch(url);
-            const data = await res.json();
-            return { year: y, count: parseInt(data.esearchresult?.count || '0') };
-          } catch { return { year: y, count: 0 }; }
-        })
-      );
+      // Fetch counts per year - batch in groups of 3 to respect rate limit
+      var yearCounts = [];
+      for (var i = 0; i < years.length; i += 3) {
+        var batch = years.slice(i, i + 3);
+        var batchResults = await Promise.all(
+          batch.map(function(yr) {
+            var params = new URLSearchParams({
+              db: 'pubmed', retmode: 'json', rettype: 'count', tool: TOOL,
+              term: term + ' AND ' + yr + '[dp]'
+            });
+            return fetchJSON(EUTILS + '/esearch.fcgi?' + params.toString())
+              .then(function(data) {
+                var c = parseInt((data.esearchresult || {}).count || '0', 10);
+                return { year: yr, count: c };
+              })
+              .catch(function(e) { console.warn('[Trends] Error for year', yr, e.message); return { year: yr, count: 0 }; });
+          })
+        );
+        yearCounts = yearCounts.concat(batchResults);
+        if (i + 3 < years.length) await delay(400);
+      }
 
-      // Fetch a sample of recent articles to extract journals and article types
-      const sampleUrl = `${EUTILS}/esearch.fcgi?db=pubmed&retmode=json&retmax=100&term=${encodeURIComponent(term)}&sort=date`;
-      const sampleRes = await fetch(sampleUrl);
-      const sampleData = await sampleRes.json();
-      const sampleIds = sampleData.esearchresult?.idlist || [];
+      // Fetch a sample of recent articles for journal/type/author stats
+      await delay(350);
+      var sampleParams = new URLSearchParams({
+        db: 'pubmed', retmode: 'json', retmax: '100', tool: TOOL, sort: 'date', term: term
+      });
+      var sampleData = await fetchJSON(EUTILS + '/esearch.fcgi?' + sampleParams.toString());
+      var sampleIds = (sampleData.esearchresult || {}).idlist || [];
+      var totalCount = parseInt((sampleData.esearchresult || {}).count || '0', 10);
 
-      let journals = {}, types = {}, authorCounts = {};
+      var journals = {}, types = {}, authorCounts = {};
 
       if (sampleIds.length > 0) {
-        const sumUrl = `${EUTILS}/esummary.fcgi?db=pubmed&retmode=json&id=${sampleIds.join(',')}`;
-        const sumRes = await fetch(sumUrl);
-        const sumData = await sumRes.json();
-        const result = sumData.result || {};
+        await delay(350);
+        var sumParams = new URLSearchParams({
+          db: 'pubmed', retmode: 'json', tool: TOOL, id: sampleIds.join(',')
+        });
+        var sumData = await fetchJSON(EUTILS + '/esummary.fcgi?' + sumParams.toString());
+        var result = sumData.result || {};
 
-        sampleIds.forEach(id => {
-          const r = result[id];
-          if (!r || !r.uid) return;
+        for (var s = 0; s < sampleIds.length; s++) {
+          var sid = sampleIds[s];
+          var r = result[sid];
+          if (!r) continue;
 
-          const journal = r.fulljournalname || r.source || '';
+          var journal = r.fulljournalname || r.source || '';
           if (journal) journals[journal] = (journals[journal] || 0) + 1;
 
-          (r.pubtype || []).forEach(t => { types[t] = (types[t] || 0) + 1; });
+          var pt = r.pubtype || [];
+          for (var t = 0; t < pt.length; t++) types[pt[t]] = (types[pt[t]] || 0) + 1;
 
-          (r.authors || []).slice(0, 3).forEach(a => {
-            if (a.name) authorCounts[a.name] = (authorCounts[a.name] || 0) + 1;
-          });
-        });
+          var auths = (r.authors || []).slice(0, 3);
+          for (var a = 0; a < auths.length; a++) {
+            if (auths[a].name) authorCounts[auths[a].name] = (authorCounts[auths[a].name] || 0) + 1;
+          }
+        }
       }
 
       // Sort and pick top items
-      const topJournals = Object.entries(journals)
-        .sort((a, b) => b[1] - a[1])
+      var topJournals = Object.entries(journals)
+        .sort(function(a, b) { return b[1] - a[1]; })
         .slice(0, 5)
-        .map(([name, count]) => ({ area: name, percentage: Math.round((count / Math.max(sampleIds.length, 1)) * 100) }));
+        .map(function(e) { return { area: e[0], percentage: Math.round((e[1] / Math.max(sampleIds.length, 1)) * 100) }; });
 
-      const topAuthors = Object.entries(authorCounts)
-        .sort((a, b) => b[1] - a[1])
+      var topAuthors = Object.entries(authorCounts)
+        .sort(function(a, b) { return b[1] - a[1]; })
         .slice(0, 5)
-        .map(([name, count]) => ({ name, publications: count, institution: '' }));
+        .map(function(e) { return { name: e[0], publications: e[1], institution: '' }; });
 
-      const topTypes = Object.entries(types)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count]) => ({ trend: name, count }));
+      var topTypes = Object.entries(types)
+        .sort(function(a, b) { return b[1] - a[1]; })
+        .slice(0, 5);
 
-      // Compute growth trends
-      const sorted = [...yearCounts].sort((a, b) => b.year - a.year);
-      const totalCount = parseInt(sampleData.esearchresult?.count || '0');
+      var sorted = yearCounts.slice().sort(function(a, b) { return b.year - a.year; });
 
-      let growth = 'N/A';
+      var growth = 'N/A';
       if (sorted.length >= 2 && sorted[1].count > 0) {
-        const pct = Math.round(((sorted[0].count - sorted[1].count) / sorted[1].count) * 100);
+        var pct = Math.round(((sorted[0].count - sorted[1].count) / sorted[1].count) * 100);
         growth = (pct >= 0 ? '+' : '') + pct + '%';
       }
 
-      const emergingTrends = topTypes.map(t => ({
-        trend: t.trend,
-        growth: `${t.count} articulos recientes`
-      }));
+      var emergingTrends = topTypes.map(function(t) {
+        return { trend: t[0], growth: t[1] + ' articulos recientes' };
+      });
 
       return {
-        summary: `Se encontraron ${totalCount.toLocaleString()} articulos sobre "${term}" en PubMed. La produccion cientifica de los ultimos ${years.length} anos muestra la evolucion temporal a continuacion.`,
+        summary: 'Se encontraron ' + totalCount.toLocaleString() + ' articulos sobre "' + term + '" en PubMed. La produccion cientifica de los ultimos ' + years.length + ' anos muestra la evolucion temporal a continuacion.',
         publicationsByYear: sorted,
         topAreas: topJournals,
-        topAuthors,
-        emergingTrends,
+        topAuthors: topAuthors,
+        emergingTrends: emergingTrends,
         yearGrowth: growth,
-        totalCount
+        totalCount: totalCount
       };
     }
 
@@ -256,31 +318,57 @@
       const [showExport, setShowExport]       = useState(false);
       const [exportFormat, setExportFormat]   = useState('APA');
       const [expandedAbstract, setExpandedAbstract] = useState(null);
+      const resultsRef = useRef([]);
 
-      const handleSearch = useCallback(async () => {
+      // Listen for background abstract loading
+      useEffect(function() {
+        function onAbstracts(e) {
+          var abstractMap = e.detail || {};
+          resultsRef.current = resultsRef.current.map(function(article) {
+            if (abstractMap[article.pmid]) {
+              return Object.assign({}, article, { abstract: abstractMap[article.pmid] });
+            }
+            return article;
+          });
+          setSearchResults(resultsRef.current.slice());
+        }
+        window.addEventListener('pubmed-abstracts', onAbstracts);
+        return function() { window.removeEventListener('pubmed-abstracts', onAbstracts); };
+      }, []);
+
+      var handleSearch = function() {
         if (!searchTerm.trim()) { setError('Introduce un termino de busqueda'); return; }
         setIsSearching(true); setError(''); setActiveTab('search');
-        try {
-          const { articles, count } = await searchPubMed(searchTerm, filters);
-          setSearchResults(articles);
-          setTotalCount(count);
-          if (articles.length === 0) setError('No se encontraron resultados');
-        } catch (err) {
-          setError('Error en la busqueda: ' + err.message);
-          setSearchResults([]);
-        } finally { setIsSearching(false); }
-      }, [searchTerm, filters]);
+        searchPubMed(searchTerm, filters)
+          .then(function(data) {
+            console.log('[App] Got', data.articles.length, 'articles, total:', data.count);
+            resultsRef.current = data.articles;
+            setSearchResults(data.articles);
+            setTotalCount(data.count);
+            if (data.articles.length === 0) setError('No se encontraron resultados para "' + searchTerm + '"');
+          })
+          .catch(function(err) {
+            console.error('[App] Search error:', err);
+            setError('Error en la busqueda: ' + err.message);
+            setSearchResults([]);
+          })
+          .finally(function() { setIsSearching(false); });
+      };
 
-      const analyzeTrends = useCallback(async () => {
+      var analyzeTrends = function() {
         if (!searchTerm.trim()) { setError('Introduce un termino de busqueda primero'); return; }
         setIsAnalyzing(true); setError(''); setActiveTab('trends');
-        try {
-          const data = await fetchTrends(searchTerm);
-          setTrendData(data);
-        } catch (err) {
-          setError('Error al analizar tendencias: ' + err.message);
-        } finally { setIsAnalyzing(false); }
-      }, [searchTerm]);
+        fetchTrends(searchTerm)
+          .then(function(data) {
+            console.log('[App] Trends loaded:', data);
+            setTrendData(data);
+          })
+          .catch(function(err) {
+            console.error('[App] Trends error:', err);
+            setError('Error al analizar tendencias: ' + err.message);
+          })
+          .finally(function() { setIsAnalyzing(false); });
+      };
 
       const toggleSelection = (article) => {
         setSelectedArticles(prev =>
