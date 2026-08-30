@@ -25,19 +25,19 @@ async function callClaude(prompt, isArray = true) {
 }
 
 export default function PubMedTool() {
-  const [query, setQuery]               = useState("");
-  const [filters, setFilters]           = useState({ yearFrom: "", yearTo: "", type: "", language: "" });
-  const [showFilters, setShowFilters]   = useState(false);
-  const [activeTab, setActiveTab]       = useState("Search");
-  const [articles, setArticles]         = useState([]);
-  const [trendData, setTrendData]       = useState(null);
-  const [impactData, setImpactData]     = useState(null);
-  const [loading, setLoading]           = useState(false);
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState({ yearFrom: "", yearTo: "", type: "", language: "" });
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState("Search");
+  const [articles, setArticles] = useState([]);
+  const [trendData, setTrendData] = useState(null);
+  const [impactData, setImpactData] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
-  const [error, setError]               = useState("");
-  const [selected, setSelected]         = useState([]);
-  const [showExport, setShowExport]     = useState(false);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState([]);
+  const [showExport, setShowExport] = useState(false);
   const [exportFormat, setExportFormat] = useState("APA");
 
   const setF = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
@@ -115,13 +115,11 @@ export default function PubMedTool() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto space-y-4">
 
-        {/* Header */}
         <div className="bg-white rounded-xl shadow p-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-1">PubMed Research Trends</h1>
           <p className="text-gray-500 text-sm">Search scientific literature · Analyze trends · Measure impact with Altmetric & Semantic Scholar</p>
         </div>
 
-        {/* Search */}
         <div className="bg-white rounded-xl shadow p-6">
           <div className="flex gap-3 mb-3 flex-wrap">
             <input
@@ -137,11 +135,11 @@ export default function PubMedTool() {
             </button>
             <button onClick={handleTrends} disabled={loadingTrends}
               className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-medium flex items-center gap-2">
-              <TrendingUp size={18}/>{loadingTrends ? "Analyzing…" : "Trends"}
+              <TrendingUp size={18} />{loadingTrends ? "Analyzing…" : "Trends"}
             </button>
             <button onClick={handleImpact} disabled={loadingImpact}
               className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 font-medium flex items-center gap-2">
-              <Star size={18}/>{loadingImpact ? "Loading…" : "Impact"}
+              <Star size={18} />{loadingImpact ? "Loading…" : "Impact"}
             </button>
           </div>
 
@@ -156,7 +154,7 @@ export default function PubMedTool() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">{l}</label>
                   <input type="number" placeholder={p} value={filters[k]}
                     onChange={(e) => setF(k, e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
               ))}
               <div>
@@ -184,9 +182,10 @@ export default function PubMedTool() {
           )}
         </div>
 
-        {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">{error}</div>}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">{error}</div>
+        )}
 
-        {/* Tabs */}
         <div className="bg-white rounded-xl shadow overflow-hidden">
           <div className="flex border-b">
             {TABS.map((tab) => (
@@ -197,35 +196,33 @@ export default function PubMedTool() {
             ))}
           </div>
 
-          {/* SEARCH TAB */}
           {activeTab === "Search" && (
             <div className="p-6">
               {loading ? (
-                <div className="text-center py-16 text-gray-500 animate-pulse">Searching PubMed…</div>
+                <div className="text-center py-16 text-gray-500">Searching PubMed…</div>
               ) : articles.length === 0 ? (
                 <div className="text-center py-16 text-gray-400">Enter a search term to find articles</div>
               ) : (
-                <>
+                <div>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="font-semibold text-gray-900">Results ({articles.length})</h2>
                     {selected.length > 0 && (
                       <button onClick={() => setShowExport(true)}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2">
-                        <BookOpen size={16}/> Export {selected.length} selected
+                        <BookOpen size={16} /> Export {selected.length} selected
                       </button>
                     )}
                   </div>
                   <div className="space-y-3">
                     {articles.map((a, idx) => (
-                      <div key={a.pmid || idx}
-                        onClick={() => toggleSelect(a.pmid)}
+                      <div key={a.pmid || idx} onClick={() => toggleSelect(a.pmid)}
                         className={`border rounded-lg p-4 cursor-pointer transition ${selected.includes(a.pmid) ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
                         <div className="flex justify-between mb-2">
                           <div className="flex-1">
                             <span className="text-xs font-semibold text-blue-600">PMID: {a.pmid}</span>
                             <h3 className="font-medium text-gray-900 mt-0.5">{a.title}</h3>
                           </div>
-                          <input type="checkbox" readOnly checked={selected.includes(a.pmid)} className="h-5 w-5 mt-1 ml-3"/>
+                          <input type="checkbox" readOnly checked={selected.includes(a.pmid)} className="h-5 w-5 mt-1 ml-3" />
                         </div>
                         <div className="grid grid-cols-2 gap-1 text-xs text-gray-600">
                           <div><b>Authors:</b> {a.authors}</div>
@@ -233,20 +230,21 @@ export default function PubMedTool() {
                           <div><b>Journal:</b> {a.journal}</div>
                           <div><b>Type:</b> {a.type}</div>
                         </div>
-                        {a.abstract && <p className="mt-2 text-xs text-gray-500 border-t pt-2">{a.abstract.slice(0,220)}…</p>}
+                        {a.abstract && (
+                          <p className="mt-2 text-xs text-gray-500 border-t pt-2">{a.abstract.slice(0, 220)}…</p>
+                        )}
                       </div>
                     ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
           )}
 
-          {/* TRENDS TAB */}
           {activeTab === "Trends" && (
             <div className="p-6">
               {loadingTrends ? (
-                <div className="text-center py-16 text-gray-500 animate-pulse">Analyzing trends…</div>
+                <div className="text-center py-16 text-gray-500">Analyzing trends…</div>
               ) : !trendData ? (
                 <div className="text-center py-16 text-gray-400">Click "Trends" to analyze research trends</div>
               ) : (
@@ -257,7 +255,9 @@ export default function PubMedTool() {
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><BarChart3 size={18}/>Publications Over Time</h3>
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <BarChart3 size={18} />Publications Over Time
+                    </h3>
                     <div className="space-y-2">
                       {(trendData.publicationsByYear || []).map((item) => {
                         const max = Math.max(...(trendData.publicationsByYear || []).map((i) => i.count), 1);
@@ -266,7 +266,7 @@ export default function PubMedTool() {
                             <div className="w-12 text-sm text-gray-600 font-medium">{item.year}</div>
                             <div className="flex-1 bg-gray-200 rounded-full h-7">
                               <div className="bg-blue-600 h-7 rounded-full flex items-center justify-end pr-2"
-                                style={{width:`${Math.max((item.count/max)*100,4)}%`}}>
+                                style={{ width: `${Math.max((item.count / max) * 100, 4)}%` }}>
                                 <span className="text-white text-xs font-medium">{item.count}</span>
                               </div>
                             </div>
@@ -280,7 +280,7 @@ export default function PubMedTool() {
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-3">Top Research Areas</h3>
                       <div className="space-y-2">
-                        {trendData.topAreas.map((a,i) => (
+                        {trendData.topAreas.map((a, i) => (
                           <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                             <span className="text-sm text-gray-900">{a.area}</span>
                             <span className="text-blue-600 font-semibold text-sm">{a.percentage}%</span>
@@ -292,9 +292,11 @@ export default function PubMedTool() {
 
                   {trendData.topAuthors?.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Users size={18}/>Top Authors</h3>
+                      <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <Users size={18} />Top Authors
+                      </h3>
                       <div className="space-y-2">
-                        {trendData.topAuthors.map((a,i) => (
+                        {trendData.topAuthors.map((a, i) => (
                           <div key={i} className="p-3 bg-gray-50 rounded-lg">
                             <div className="font-medium text-gray-900 text-sm">{a.name}</div>
                             <div className="text-xs text-gray-500">{a.institution}</div>
@@ -307,9 +309,11 @@ export default function PubMedTool() {
 
                   {trendData.emergingTrends?.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><TrendingUp size={18}/>Emerging Trends</h3>
+                      <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <TrendingUp size={18} />Emerging Trends
+                      </h3>
                       <div className="space-y-2">
-                        {trendData.emergingTrends.map((t,i) => (
+                        {trendData.emergingTrends.map((t, i) => (
                           <div key={i} className="p-3 bg-green-50 border border-green-200 rounded-lg flex justify-between items-start">
                             <span className="text-sm text-gray-900 flex-1">{t.trend}</span>
                             <span className="text-green-700 font-semibold text-sm ml-3">{t.growth}</span>
@@ -323,23 +327,21 @@ export default function PubMedTool() {
             </div>
           )}
 
-          {/* IMPACT TAB */}
           {activeTab === "Altmetric & Impact" && (
             <div className="p-6">
               {loadingImpact ? (
-                <div className="text-center py-16 text-gray-500 animate-pulse">Loading Altmetric & Semantic Scholar data…</div>
+                <div className="text-center py-16 text-gray-500">Loading Altmetric & Semantic Scholar data…</div>
               ) : !impactData ? (
                 <div className="text-center py-16 text-gray-400">Click "Impact" to load Altmetric & Semantic Scholar data</div>
               ) : (
                 <div className="space-y-6">
-
                   {impactData.fieldOverview && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
-                        { label:"Total Citations",     value: impactData.fieldOverview.totalCitations?.toLocaleString() },
-                        { label:"Avg Altmetric Score", value: impactData.fieldOverview.avgAltmetricScore },
-                        { label:"Open Access",         value: impactData.fieldOverview.openAccessPercentage + "%" },
-                        { label:"Top Country",         value: impactData.fieldOverview.topCountries?.[0]?.country },
+                        { label: "Total Citations",     value: impactData.fieldOverview.totalCitations?.toLocaleString() },
+                        { label: "Avg Altmetric Score", value: impactData.fieldOverview.avgAltmetricScore },
+                        { label: "Open Access",         value: impactData.fieldOverview.openAccessPercentage + "%" },
+                        { label: "Top Country",         value: impactData.fieldOverview.topCountries?.[0]?.country },
                       ].map((item) => (
                         <div key={item.label} className="bg-gray-50 border rounded-lg p-4 text-center">
                           <div className="text-2xl font-bold text-blue-600">{item.value}</div>
@@ -369,7 +371,7 @@ export default function PubMedTool() {
                               </span>
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-center">
-                              {Object.entries(paper.altmetric.breakdown || {}).map(([k,v]) => (
+                              {Object.entries(paper.altmetric.breakdown || {}).map(([k, v]) => (
                                 <div key={k} className="bg-white rounded p-1.5">
                                   <div className="text-sm font-bold text-gray-800">{v}</div>
                                   <div className="text-xs text-gray-500 capitalize">{k}</div>
@@ -387,9 +389,9 @@ export default function PubMedTool() {
                             <h5 className="font-semibold text-blue-900 text-sm mb-3">Semantic Scholar</h5>
                             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                               {[
-                                { label:"Citations",   value: paper.semanticScholar.citations },
-                                { label:"Influential", value: paper.semanticScholar.influentialCitations },
-                                { label:"Per Year",    value: paper.semanticScholar.citationsPerYear },
+                                { label: "Citations",   value: paper.semanticScholar.citations },
+                                { label: "Influential", value: paper.semanticScholar.influentialCitations },
+                                { label: "Per Year",    value: paper.semanticScholar.citationsPerYear },
                               ].map((m) => (
                                 <div key={m.label} className="bg-white rounded p-1.5">
                                   <div className="text-sm font-bold text-gray-800">{m.value}</div>
@@ -400,8 +402,10 @@ export default function PubMedTool() {
 
                             {paper.semanticScholar.relatedAuthors?.length > 0 && (
                               <div className="mb-2">
-                                <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1"><Users size={12}/>Related Authors</p>
-                                {paper.semanticScholar.relatedAuthors.map((a,j) => (
+                                <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1">
+                                  <Users size={12} />Related Authors
+                                </p>
+                                {paper.semanticScholar.relatedAuthors.map((a, j) => (
                                   <div key={j} className="text-xs text-gray-700 flex justify-between bg-white rounded px-2 py-1 mb-1">
                                     <span className="font-medium">{a.name}</span>
                                     <span className="text-blue-600">{a.papers} papers</span>
@@ -412,8 +416,10 @@ export default function PubMedTool() {
 
                             {paper.semanticScholar.influentialPapers?.length > 0 && (
                               <div>
-                                <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1"><Quote size={12}/>Influential Papers</p>
-                                {paper.semanticScholar.influentialPapers.map((p,j) => (
+                                <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1">
+                                  <Quote size={12} />Influential Papers
+                                </p>
+                                {paper.semanticScholar.influentialPapers.map((p, j) => (
                                   <div key={j} className="text-xs text-gray-700 bg-white rounded px-2 py-1 mb-1">
                                     <span className="font-medium">{p.title}</span>
                                     <span className="text-gray-400 ml-2">({p.year}) · {p.citations} cites</span>
@@ -433,26 +439,25 @@ export default function PubMedTool() {
         </div>
       </div>
 
-      {/* Export modal */}
       {showExport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-xl w-full max-h-screen overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Export Bibliography</h3>
             <div className="mb-4">
               <p className="text-sm font-medium text-gray-700 mb-2">Format:</p>
-              {["APA","Vancouver","MLA"].map((f) => (
+              {["APA", "Vancouver", "MLA"].map((f) => (
                 <label key={f} className="flex items-center gap-2 mb-1">
-                  <input type="radio" checked={exportFormat===f} onChange={()=>setExportFormat(f)} className="h-4 w-4"/>
+                  <input type="radio" checked={exportFormat === f} onChange={() => setExportFormat(f)} className="h-4 w-4" />
                   <span className="text-sm">{f}</span>
                 </label>
               ))}
             </div>
             <pre className="bg-gray-50 p-3 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap max-h-60 mb-4">
-              {articles.filter((a)=>selected.includes(a.pmid)).map(cite).join("\n\n")}
+              {articles.filter((a) => selected.includes(a.pmid)).map(cite).join("\n\n")}
             </pre>
             <div className="flex gap-3">
               <button onClick={downloadBib} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm">Download</button>
-              <button onClick={()=>setShowExport(false)} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 text-sm">Close</button>
+              <button onClick={() => setShowExport(false)} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 text-sm">Close</button>
             </div>
           </div>
         </div>
