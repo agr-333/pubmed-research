@@ -1,45 +1,46 @@
 import { useState } from "react";
-import { Search, TrendingUp, BarChart3, BookOpen, Users, ExternalLink, Star, Quote } from "lucide-react";
+import { TrendingUp, BarChart3, BookOpen, Users, Star, Quote } from "lucide-react";
 
 const TABS = ["Search", "Trends", "Altmetric & Impact"];
 
+async function callClaude(prompt, isArray = true) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 6000,
+      system: "You are a JSON API. Respond with ONLY valid JSON. No explanation, no markdown, no code blocks. Just raw JSON.",
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) throw new Error("API error " + res.status);
+  const d = await res.json();
+  let text = d.content?.find((i) => i.type === "text")?.text || "";
+  text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+  const pattern = isArray ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+  const match = text.match(pattern);
+  if (!match) throw new Error("Invalid JSON response");
+  return JSON.parse(match[0]);
+}
+
 export default function PubMedTool() {
-  const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState({ yearFrom: "", yearTo: "", type: "", language: "" });
-  const [showFilters, setShowFilters] = useState(false);
-  const [activeTab, setActiveTab] = useState("Search");
-  const [articles, setArticles] = useState([]);
-  const [trendData, setTrendData] = useState(null);
-  const [impactData, setImpactData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [query, setQuery]               = useState("");
+  const [filters, setFilters]           = useState({ yearFrom: "", yearTo: "", type: "", language: "" });
+  const [showFilters, setShowFilters]   = useState(false);
+  const [activeTab, setActiveTab]       = useState("Search");
+  const [articles, setArticles]         = useState([]);
+  const [trendData, setTrendData]       = useState(null);
+  const [impactData, setImpactData]     = useState(null);
+  const [loading, setLoading]           = useState(false);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
-  const [error, setError] = useState("");
-  const [selected, setSelected] = useState([]);
-  const [showExport, setShowExport] = useState(false);
+  const [error, setError]               = useState("");
+  const [selected, setSelected]         = useState([]);
+  const [showExport, setShowExport]     = useState(false);
   const [exportFormat, setExportFormat] = useState("APA");
 
-  const callClaude = async (prompt, isArray = true) => {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 6000,
-        system: "You are a JSON API. You must respond with ONLY raw JSON, no explanation, no markdown, no code blocks, no preamble. Your entire response must be valid JSON that can be parsed with JSON.parse().",
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-    if (!res.ok) throw new Error("API error " + res.status);
-    const d = await res.json();
-    let text = d.content?.find((i) => i.type === "text")?.text || "";
-    text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const match = isArray ? text.match(/\[[\s\S]*\]/) : text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("No valid JSON found in response");
-    return match[0];
-  };
-
-  const callClaudeObject = async (prompt) => callClaude(prompt, false);
+  const setF = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
 
   const handleSearch = async () => {
     if (!query.trim()) { setError("Please enter a search term"); return; }
@@ -48,11 +49,14 @@ export default function PubMedTool() {
       let f = "";
       if (filters.yearFrom) f += ` From year ${filters.yearFrom}.`;
       if (filters.yearTo)   f += ` To year ${filters.yearTo}.`;
-      if (filters.type)     f += ` Article type: ${filters.type}.`;
+      if (filters.type)     f += ` Type: ${filters.type}.`;
       if (filters.language) f += ` Language: ${filters.language}.`;
-
-      const raw = await callClaude(`Return a JSON array of 15 PubMed articles about "${query}".${f} Each object: {"pmid":"string","title":"string","authors":"string","journal":"string","year":"string","abstract":"string","doi":"string","type":"string"}`);
-      setArticles(JSON.parse(raw));
+      const data = await callClaude(
+        `Return a JSON array of 15 PubMed articles about "${query}".${f} ` +
+        `Schema: [{"pmid":"","title":"","authors":"","journal":"","year":"","abstract":"","doi":"","type":""}]`,
+        true
+      );
+      setArticles(data);
     } catch (e) { setError("Search failed: " + e.message); }
     finally { setLoading(false); }
   };
@@ -61,9 +65,13 @@ export default function PubMedTool() {
     if (!query.trim()) { setError("Enter a search term first"); return; }
     setLoadingTrends(true); setError(""); setActiveTab("Trends");
     try {
-      const raw = await callClaudeObject(`Return a JSON object with PubMed trend data for "${query}": {"summary":"string","publicationsByYear":[{"year":2024,"count":0}],"topAreas":[{"area":"string","percentage":0}],"topAuthors":[{"name":"string","institution":"string","publications":0}],"emergingTrends":[{"trend":"string","growth":"string"}]}`);
-      setTrendData(JSON.parse(raw));
-    } catch (e) { setError("Trend analysis failed: " + e.message); }
+      const data = await callClaude(
+        `Return a JSON object with PubMed research trend data for "${query}". ` +
+        `Schema: {"summary":"","publicationsByYear":[{"year":2024,"count":0}],"topAreas":[{"area":"","percentage":0}],"topAuthors":[{"name":"","institution":"","publications":0}],"emergingTrends":[{"trend":"","growth":""}]}`,
+        false
+      );
+      setTrendData(data);
+    } catch (e) { setError("Trends failed: " + e.message); }
     finally { setLoadingTrends(false); }
   };
 
@@ -71,9 +79,13 @@ export default function PubMedTool() {
     if (!query.trim()) { setError("Enter a search term first"); return; }
     setLoadingImpact(true); setError(""); setActiveTab("Altmetric & Impact");
     try {
-      const raw = await callClaudeObject(`Return a JSON object with Altmetric and Semantic Scholar impact data for 5 top papers about "${query}": {"topPapers":[{"pmid":"string","title":"string","authors":"string","year":"string","doi":"string","altmetric":{"score":0,"breakdown":{"news":0,"blogs":0,"twitter":0,"facebook":0,"wikipedia":0,"policy":0},"trend":"rising"},"semanticScholar":{"citations":0,"influentialCitations":0,"citationsPerYear":0,"relatedAuthors":[{"name":"string","papers":0,"affiliation":"string"}],"influentialPapers":[{"title":"string","year":"string","citations":0}]}}],"fieldOverview":{"totalCitations":0,"avgAltmetricScore":0,"topCountries":[{"country":"string","papers":0}],"openAccessPercentage":0}}`);
-      setImpactData(JSON.parse(raw));
-    } catch (e) { setError("Impact analysis failed: " + e.message); }
+      const data = await callClaude(
+        `Return a JSON object with Altmetric and Semantic Scholar data for 5 top papers about "${query}". ` +
+        `Schema: {"topPapers":[{"pmid":"","title":"","authors":"","year":"","doi":"","altmetric":{"score":0,"breakdown":{"news":0,"blogs":0,"twitter":0,"facebook":0,"wikipedia":0,"policy":0},"trend":"rising"},"semanticScholar":{"citations":0,"influentialCitations":0,"citationsPerYear":0,"relatedAuthors":[{"name":"","papers":0,"affiliation":""}],"influentialPapers":[{"title":"","year":"","citations":0}]}}],"fieldOverview":{"totalCitations":0,"avgAltmetricScore":0,"topCountries":[{"country":"","papers":0}],"openAccessPercentage":0}}`,
+        false
+      );
+      setImpactData(data);
+    } catch (e) { setError("Impact failed: " + e.message); }
     finally { setLoadingImpact(false); }
   };
 
@@ -81,21 +93,22 @@ export default function PubMedTool() {
     setSelected((s) => s.includes(pmid) ? s.filter((x) => x !== pmid) : [...s, pmid]);
 
   const cite = (a) => {
-    const auth = a.authors.split(",")[0].trim() + " et al.";
-    if (exportFormat === "APA") return `${auth} (${a.year}). ${a.title}. ${a.journal}. ${a.doi ? "https://doi.org/" + a.doi : "PMID: " + a.pmid}`;
+    const auth = (a.authors || "").split(",")[0].trim() + " et al.";
+    if (exportFormat === "APA")       return `${auth} (${a.year}). ${a.title}. ${a.journal}. ${a.doi ? "https://doi.org/" + a.doi : "PMID: " + a.pmid}`;
     if (exportFormat === "Vancouver") return `${auth}. ${a.title}. ${a.journal}. ${a.year}. PMID: ${a.pmid}`;
     return `${auth} "${a.title}." ${a.journal} (${a.year}).`;
   };
 
   const downloadBib = () => {
-    const sel = articles.filter((a) => selected.includes(a.pmid));
-    const blob = new Blob([sel.map(cite).join("\n\n")], { type: "text/plain" });
+    const content = articles.filter((a) => selected.includes(a.pmid)).map(cite).join("\n\n");
+    const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "bibliography.txt"; a.click();
+    const a = document.createElement("a");
+    a.href = url; a.download = "bibliography.txt"; a.click();
     URL.revokeObjectURL(url);
   };
 
-  const altmetricColor = (score) =>
+  const altColor = (score) =>
     score > 200 ? "bg-red-500" : score > 100 ? "bg-orange-500" : score > 50 ? "bg-yellow-500" : "bg-blue-500";
 
   return (
@@ -108,14 +121,14 @@ export default function PubMedTool() {
           <p className="text-gray-500 text-sm">Search scientific literature · Analyze trends · Measure impact with Altmetric & Semantic Scholar</p>
         </div>
 
-        {/* Search box */}
+        {/* Search */}
         <div className="bg-white rounded-xl shadow p-6">
           <div className="flex gap-3 mb-3 flex-wrap">
             <input
               type="text" value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="Search by topic, disease, treatment, author..."
+              placeholder="Search by topic, disease, treatment..."
               className="flex-1 min-w-[200px] border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
             <button onClick={handleSearch} disabled={loading}
@@ -124,30 +137,31 @@ export default function PubMedTool() {
             </button>
             <button onClick={handleTrends} disabled={loadingTrends}
               className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-medium flex items-center gap-2">
-              <TrendingUp size={18} /> {loadingTrends ? "Analyzing…" : "Trends"}
+              <TrendingUp size={18}/>{loadingTrends ? "Analyzing…" : "Trends"}
             </button>
             <button onClick={handleImpact} disabled={loadingImpact}
               className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 font-medium flex items-center gap-2">
-              <Star size={18} /> {loadingImpact ? "Loading…" : "Impact"}
+              <Star size={18}/>{loadingImpact ? "Loading…" : "Impact"}
             </button>
           </div>
 
-          <button onClick={() => setShowFilters(!showFilters)} className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+          <button onClick={() => setShowFilters((v) => !v)} className="text-sm text-gray-600 hover:text-gray-900">
             ⚙ Filters {showFilters ? "▲" : "▼"}
           </button>
+
           {showFilters && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t">
               {[["yearFrom","From year","2020"],["yearTo","To year","2024"]].map(([k,l,p]) => (
                 <div key={k}>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{l}</label>
                   <input type="number" placeholder={p} value={filters[k]}
-                    onChange={(e) => setFilters({...filters,[k]:e.target.value})}
+                    onChange={(e) => setF(k, e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
                 </div>
               ))}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Article Type</label>
-                <select value={filters.type} onChange={(e) => setFilters({...filters,type:e.target.value})}
+                <select value={filters.type} onChange={(e) => setF("type", e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                   <option value="">All</option>
                   <option>Clinical Trial</option>
@@ -158,7 +172,7 @@ export default function PubMedTool() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Language</label>
-                <select value={filters.language} onChange={(e) => setFilters({...filters,language:e.target.value})}
+                <select value={filters.language} onChange={(e) => setF("language", e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                   <option value="">All</option>
                   <option>English</option>
@@ -177,13 +191,13 @@ export default function PubMedTool() {
           <div className="flex border-b">
             {TABS.map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-5 py-3 font-medium text-sm ${activeTab === tab ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-800"}`}>
+                className={`px-5 py-3 font-medium text-sm transition ${activeTab === tab ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-800"}`}>
                 {tab}
               </button>
             ))}
           </div>
 
-          {/* ── SEARCH TAB ── */}
+          {/* SEARCH TAB */}
           {activeTab === "Search" && (
             <div className="p-6">
               {loading ? (
@@ -202,18 +216,18 @@ export default function PubMedTool() {
                     )}
                   </div>
                   <div className="space-y-3">
-                    {articles.map((a) => (
-                      <div key={a.pmid}
-                        className={`border rounded-lg p-4 cursor-pointer transition ${selected.includes(a.pmid) ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}
-                        onClick={() => toggleSelect(a.pmid)}>
+                    {articles.map((a, idx) => (
+                      <div key={a.pmid || idx}
+                        onClick={() => toggleSelect(a.pmid)}
+                        className={`border rounded-lg p-4 cursor-pointer transition ${selected.includes(a.pmid) ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
                         <div className="flex justify-between mb-2">
                           <div className="flex-1">
                             <span className="text-xs font-semibold text-blue-600">PMID: {a.pmid}</span>
                             <h3 className="font-medium text-gray-900 mt-0.5">{a.title}</h3>
                           </div>
-                          <input type="checkbox" checked={selected.includes(a.pmid)} onChange={() => {}} className="h-5 w-5 mt-1 ml-3"/>
+                          <input type="checkbox" readOnly checked={selected.includes(a.pmid)} className="h-5 w-5 mt-1 ml-3"/>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                        <div className="grid grid-cols-2 gap-1 text-xs text-gray-600">
                           <div><b>Authors:</b> {a.authors}</div>
                           <div><b>Year:</b> {a.year}</div>
                           <div><b>Journal:</b> {a.journal}</div>
@@ -228,7 +242,7 @@ export default function PubMedTool() {
             </div>
           )}
 
-          {/* ── TRENDS TAB ── */}
+          {/* TRENDS TAB */}
           {activeTab === "Trends" && (
             <div className="p-6">
               {loadingTrends ? (
@@ -242,18 +256,17 @@ export default function PubMedTool() {
                     <p className="text-blue-800 text-sm">{trendData.summary}</p>
                   </div>
 
-                  {/* Publications by year */}
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><BarChart3 size={18}/>Publications Over Time</h3>
                     <div className="space-y-2">
-                      {trendData.publicationsByYear?.map((item) => {
-                        const max = Math.max(...trendData.publicationsByYear.map((i) => i.count));
+                      {(trendData.publicationsByYear || []).map((item) => {
+                        const max = Math.max(...(trendData.publicationsByYear || []).map((i) => i.count), 1);
                         return (
                           <div key={item.year} className="flex items-center gap-3">
                             <div className="w-12 text-sm text-gray-600 font-medium">{item.year}</div>
                             <div className="flex-1 bg-gray-200 rounded-full h-7">
                               <div className="bg-blue-600 h-7 rounded-full flex items-center justify-end pr-2"
-                                style={{width:`${(item.count/max)*100}%`}}>
+                                style={{width:`${Math.max((item.count/max)*100,4)}%`}}>
                                 <span className="text-white text-xs font-medium">{item.count}</span>
                               </div>
                             </div>
@@ -263,8 +276,7 @@ export default function PubMedTool() {
                     </div>
                   </div>
 
-                  {/* Top areas */}
-                  {trendData.topAreas && (
+                  {trendData.topAreas?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-3">Top Research Areas</h3>
                       <div className="space-y-2">
@@ -278,8 +290,7 @@ export default function PubMedTool() {
                     </div>
                   )}
 
-                  {/* Top authors */}
-                  {trendData.topAuthors && (
+                  {trendData.topAuthors?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Users size={18}/>Top Authors</h3>
                       <div className="space-y-2">
@@ -294,8 +305,7 @@ export default function PubMedTool() {
                     </div>
                   )}
 
-                  {/* Emerging trends */}
-                  {trendData.emergingTrends && (
+                  {trendData.emergingTrends?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><TrendingUp size={18}/>Emerging Trends</h3>
                       <div className="space-y-2">
@@ -313,7 +323,7 @@ export default function PubMedTool() {
             </div>
           )}
 
-          {/* ── IMPACT TAB ── */}
+          {/* IMPACT TAB */}
           {activeTab === "Altmetric & Impact" && (
             <div className="p-6">
               {loadingImpact ? (
@@ -323,14 +333,13 @@ export default function PubMedTool() {
               ) : (
                 <div className="space-y-6">
 
-                  {/* Field overview */}
                   {impactData.fieldOverview && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
-                        { label:"Total Citations",       value: impactData.fieldOverview.totalCitations?.toLocaleString() },
-                        { label:"Avg Altmetric Score",   value: impactData.fieldOverview.avgAltmetricScore },
-                        { label:"Open Access",           value: impactData.fieldOverview.openAccessPercentage + "%" },
-                        { label:"Top Country",           value: impactData.fieldOverview.topCountries?.[0]?.country },
+                        { label:"Total Citations",     value: impactData.fieldOverview.totalCitations?.toLocaleString() },
+                        { label:"Avg Altmetric Score", value: impactData.fieldOverview.avgAltmetricScore },
+                        { label:"Open Access",         value: impactData.fieldOverview.openAccessPercentage + "%" },
+                        { label:"Top Country",         value: impactData.fieldOverview.topCountries?.[0]?.country },
                       ].map((item) => (
                         <div key={item.label} className="bg-gray-50 border rounded-lg p-4 text-center">
                           <div className="text-2xl font-bold text-blue-600">{item.value}</div>
@@ -340,11 +349,10 @@ export default function PubMedTool() {
                     </div>
                   )}
 
-                  {/* Top papers */}
                   <h3 className="font-semibold text-gray-900 text-lg">Top Papers by Impact</h3>
-                  {impactData.topPapers?.map((paper, i) => (
+
+                  {(impactData.topPapers || []).map((paper, i) => (
                     <div key={i} className="border-2 border-gray-100 rounded-xl p-5 space-y-4">
-                      {/* Paper header */}
                       <div>
                         <span className="text-xs text-blue-600 font-semibold">PMID: {paper.pmid} · {paper.year}</span>
                         <h4 className="font-semibold text-gray-900 mt-1">{paper.title}</h4>
@@ -352,12 +360,11 @@ export default function PubMedTool() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Altmetric block */}
                         {paper.altmetric && (
                           <div className="bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
                               <h5 className="font-semibold text-orange-900 text-sm">Altmetric Score</h5>
-                              <span className={`${altmetricColor(paper.altmetric.score)} text-white text-xl font-bold w-12 h-12 rounded-full flex items-center justify-center`}>
+                              <span className={`${altColor(paper.altmetric.score)} text-white text-xl font-bold w-12 h-12 rounded-full flex items-center justify-center`}>
                                 {paper.altmetric.score}
                               </span>
                             </div>
@@ -375,15 +382,14 @@ export default function PubMedTool() {
                           </div>
                         )}
 
-                        {/* Semantic Scholar block */}
                         {paper.semanticScholar && (
                           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
                             <h5 className="font-semibold text-blue-900 text-sm mb-3">Semantic Scholar</h5>
                             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                               {[
-                                { label:"Citations",     value: paper.semanticScholar.citations },
-                                { label:"Influential",   value: paper.semanticScholar.influentialCitations },
-                                { label:"Per Year",      value: paper.semanticScholar.citationsPerYear },
+                                { label:"Citations",   value: paper.semanticScholar.citations },
+                                { label:"Influential", value: paper.semanticScholar.influentialCitations },
+                                { label:"Per Year",    value: paper.semanticScholar.citationsPerYear },
                               ].map((m) => (
                                 <div key={m.label} className="bg-white rounded p-1.5">
                                   <div className="text-sm font-bold text-gray-800">{m.value}</div>
@@ -392,7 +398,6 @@ export default function PubMedTool() {
                               ))}
                             </div>
 
-                            {/* Related authors */}
                             {paper.semanticScholar.relatedAuthors?.length > 0 && (
                               <div className="mb-2">
                                 <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1"><Users size={12}/>Related Authors</p>
@@ -405,7 +410,6 @@ export default function PubMedTool() {
                               </div>
                             )}
 
-                            {/* Influential papers */}
                             {paper.semanticScholar.influentialPapers?.length > 0 && (
                               <div>
                                 <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1"><Quote size={12}/>Influential Papers</p>
