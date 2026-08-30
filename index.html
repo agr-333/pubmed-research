@@ -296,35 +296,36 @@ function renderTrends(counts, top5, q) {
     </div>`;
 }
 
-/* ── Impact (NIH iCite, CORS-friendly, no key needed) ── */
+/* ── Impact (OpenAlex — broad citation coverage, no key needed) ── */
 async function doImpact() {
   const q = document.getElementById('query').value.trim();
   if (!q) { showErr('Enter a search term first'); return; }
-  hideErr(); showLoad('Loading citation data from NIH iCite…');
+  hideErr(); showLoad('Loading citation data from OpenAlex…');
   document.getElementById('tabArea').classList.remove('hidden');
   showTab('impact');
   document.getElementById('pane-impact').innerHTML='<div class="text-center py-16 text-gray-400">Loading…</div>';
   try {
-    const { ids } = await fetchPmids(q, 10);
-    if (!ids.length) { showErr('No PubMed results for this query.'); hideLoad(); return; }
-    const summaries = await fetchSummaries(ids);
-    const r = await fetch(`https://icite.od.nih.gov/api/pubs?pmids=${ids.join(',')}`);
-    if (!r.ok) throw new Error('iCite API error ' + r.status);
+    const url = `https://api.openalex.org/works?search=${encodeURIComponent(q)}` +
+                `&per-page=10&sort=cited_by_count:desc&mailto=agr333@gmail.com`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('OpenAlex API error ' + r.status);
     const d = await r.json();
-    const merged = summaries.map(s => {
-      const m = (d.data || []).find(x => String(x.pmid) === s.pmid) || {};
-      return {
-        ...s,
-        citationCount:   m.citation_count       || 0,
-        citsPerYear:     m.citations_per_year   || 0,
-        rcr:             m.relative_citation_ratio,
-        nihPercentile:   m.nih_percentile,
-        fieldCitRate:    m.field_citation_rate,
-        isClinical:      m.is_clinical,
-        doi:             m.doi || s.doi
-      };
-    }).sort((a,b) => b.citationCount - a.citationCount);
-    renderImpact(merged, q);
+    const papers = (d.results || []).map(w => ({
+      openAlexId:   w.id,
+      title:        w.title || w.display_name || '',
+      year:         w.publication_year || '',
+      authors:      (w.authorships||[]).slice(0,4).map(a=>a.author?.display_name).filter(Boolean).join(', ')
+                    + ((w.authorships||[]).length>4 ? ' et al.' : ''),
+      journal:      w.primary_location?.source?.display_name || w.host_venue?.display_name || '',
+      doi:          (w.doi||'').replace('https://doi.org/',''),
+      pmid:         (w.ids?.pmid||'').split('/').pop() || '',
+      citationCount:w.cited_by_count || 0,
+      recentCites:  (w.counts_by_year||[]).slice(0,3).reduce((s,y)=>s+(y.cited_by_count||0),0),
+      oaUrl:        w.open_access?.oa_url || '',
+      oaStatus:     w.open_access?.oa_status || 'closed',
+      type:         w.type || ''
+    }));
+    renderImpact(papers, q);
   } catch(e) { showErr('Impact failed: '+e.message); }
   hideLoad();
 }
@@ -334,62 +335,61 @@ function renderImpact(papers, q) {
 
   const totalCites = papers.reduce((s,p)=>s+(p.citationCount||0),0);
   const avgCites   = Math.round(totalCites/papers.length);
-  const withRcr    = papers.filter(p => typeof p.rcr === 'number');
-  const avgRcr     = withRcr.length ? (withRcr.reduce((s,p)=>s+p.rcr,0)/withRcr.length).toFixed(2) : '—';
+  const recentSum  = papers.reduce((s,p)=>s+(p.recentCites||0),0);
 
   const overview = `
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       ${[
-        {l:'Papers Found',    v:papers.length},
-        {l:'Total Citations', v:totalCites.toLocaleString()},
-        {l:'Avg Citations',   v:avgCites},
-        {l:'Avg RCR',         v:avgRcr},
+        {l:'Papers Found',        v:papers.length},
+        {l:'Total Citations',     v:totalCites.toLocaleString()},
+        {l:'Avg Citations',       v:avgCites.toLocaleString()},
+        {l:'Citations (last 3y)', v:recentSum.toLocaleString()},
       ].map(i=>`<div class="bg-gray-50 border rounded-lg p-4 text-center">
         <div class="text-2xl font-bold text-blue-600">${i.v}</div>
         <div class="text-xs text-gray-500 mt-1">${i.l}</div>
       </div>`).join('')}
     </div>
-    <p class="text-xs text-gray-500 mb-4">Source: NIH iCite · RCR = Relative Citation Ratio (1.0 = median NIH-funded paper).</p>`;
+    <p class="text-xs text-gray-500 mb-4">Source: OpenAlex · Citations aggregated across all disciplines (successor to Microsoft Academic Graph).</p>`;
 
   const cards = papers.map(p=>{
-    const doi = p.doi || '';
-    const rcr = typeof p.rcr === 'number' ? p.rcr.toFixed(2) : '—';
-    const pct = typeof p.nihPercentile === 'number' ? Math.round(p.nihPercentile) + '%' : '—';
-    const cpy = p.citsPerYear ? p.citsPerYear.toFixed(1) : '—';
+    const oaBadge = p.oaStatus !== 'closed'
+      ? (p.oaUrl
+          ? `<a href="${p.oaUrl}" target="_blank" class="text-xs text-green-600 font-medium">🔓 Open Access (${p.oaStatus})</a>`
+          : `<span class="text-xs text-green-600 font-medium">🔓 ${p.oaStatus}</span>`)
+      : '<span class="text-xs text-gray-400">🔒 Subscription required</span>';
     return `
       <div class="border-2 border-gray-100 rounded-xl p-5 mb-4">
         <div class="mb-3">
-          <span class="text-xs text-blue-600 font-semibold">PMID: ${p.pmid} · </span>
+          ${p.pmid?`<span class="text-xs text-blue-600 font-semibold">PMID: ${p.pmid} · </span>`:''}
           <span class="text-xs text-gray-500">${p.year||'N/A'}</span>
-          ${p.isClinical?'<span class="ml-2 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Clinical</span>':''}
-          <h4 class="font-semibold text-gray-900 mt-1">${p.title||''}</h4>
+          ${p.type?`<span class="ml-2 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">${p.type}</span>`:''}
+          <h4 class="font-semibold text-gray-900 mt-1">${p.title}</h4>
           <p class="text-xs text-gray-500 mt-0.5">${p.authors||''}</p>
           <p class="text-xs text-gray-400 mt-0.5">${p.journal||''}</p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-            <h5 class="font-semibold text-blue-900 text-sm mb-3">NIH iCite Metrics</h5>
-            <div class="grid grid-cols-4 gap-2 text-center mb-3">
+            <h5 class="font-semibold text-blue-900 text-sm mb-3">OpenAlex Metrics</h5>
+            <div class="grid grid-cols-2 gap-2 text-center mb-3">
               ${[
-                {l:'Citations',  v:(p.citationCount||0).toLocaleString()},
-                {l:'Cits/Year',  v:cpy},
-                {l:'RCR',        v:rcr},
-                {l:'NIH %ile',   v:pct},
-              ].map(m=>`<div class="bg-white rounded p-1.5">
-                <div class="text-sm font-bold text-gray-800">${m.v}</div>
+                {l:'Total Citations',   v:(p.citationCount||0).toLocaleString()},
+                {l:'Citations (3y)',    v:(p.recentCites||0).toLocaleString()},
+              ].map(m=>`<div class="bg-white rounded p-2">
+                <div class="text-lg font-bold text-gray-800">${m.v}</div>
                 <div class="text-xs text-gray-500">${m.l}</div>
               </div>`).join('')}
             </div>
-            <div class="flex flex-wrap gap-3 text-xs">
-              <a href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank" class="text-blue-600 hover:underline">PubMed ↗</a>
-              ${doi?`<a href="https://doi.org/${doi}" target="_blank" class="text-blue-600 hover:underline">DOI: ${doi}</a>`:''}
-              <a href="https://icite.od.nih.gov/analysis?pmids=${p.pmid}" target="_blank" class="text-blue-600 hover:underline">iCite report ↗</a>
+            <div class="mt-2">${oaBadge}</div>
+            <div class="flex flex-wrap gap-3 text-xs mt-2">
+              ${p.pmid?`<a href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank" class="text-blue-600 hover:underline">PubMed ↗</a>`:''}
+              ${p.doi?`<a href="https://doi.org/${p.doi}" target="_blank" class="text-blue-600 hover:underline">DOI ↗</a>`:''}
+              <a href="${p.openAlexId}" target="_blank" class="text-blue-600 hover:underline">OpenAlex ↗</a>
             </div>
           </div>
           <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4">
             <h5 class="font-semibold text-orange-900 text-sm mb-2">Altmetric</h5>
             <p class="text-xs text-gray-600 mb-3">View real-time attention data on Altmetric.com:</p>
-            ${doi?`<a href="https://www.altmetric.com/details/${doi}" target="_blank"
+            ${p.doi?`<a href="https://www.altmetric.com/details/${p.doi}" target="_blank"
               class="inline-block bg-orange-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-orange-600">
               View Altmetric Score ↗
             </a>`:'<span class="text-xs text-gray-400">DOI not available</span>'}
@@ -401,7 +401,6 @@ function renderImpact(papers, q) {
   document.getElementById('pane-impact').innerHTML = overview +
     `<h3 class="font-semibold text-gray-900 text-lg mb-4">Top Papers by Citation Count</h3>` + cards;
 }
-
 /* ── Export ── */
 function openExport() {
   const sel = allArticles.filter(a=>selectedPmids.includes(a.pmid));
