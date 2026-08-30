@@ -6,10 +6,10 @@
 <title>PubMed Research Trends</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  .bar { transition: width 0.5s ease; }
-  .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .hidden { display: none; }
+  .bar { transition: width 0.6s ease; }
+  .spinner { display:inline-block;width:36px;height:36px;border:4px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .hidden { display:none; }
 </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4">
@@ -18,10 +18,10 @@
   <!-- Header -->
   <div class="bg-white rounded-xl shadow p-6">
     <h1 class="text-3xl font-bold text-gray-900">PubMed Research Trends</h1>
-    <p class="text-gray-500 text-sm mt-1">Search scientific literature · Analyze trends · Measure impact with Altmetric &amp; Semantic Scholar</p>
+    <p class="text-gray-500 text-sm mt-1">Search scientific literature · Analyze trends · Measure impact</p>
   </div>
 
-  <!-- Search box -->
+  <!-- Search -->
   <div class="bg-white rounded-xl shadow p-6">
     <div class="flex gap-3 mb-3 flex-wrap">
       <input id="query" type="text" placeholder="Search by topic, disease, treatment..."
@@ -31,20 +31,35 @@
       <button onclick="doTrends()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium">📈 Trends</button>
       <button onclick="doImpact()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-medium">⭐ Impact</button>
     </div>
-    <button onclick="toggleFilters()" class="text-sm text-gray-600 hover:text-gray-900">⚙ Filters ▼</button>
-    <div id="filters" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t">
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">From year</label>
-        <input id="yearFrom" type="number" placeholder="2020" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/></div>
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">To year</label>
-        <input id="yearTo" type="number" placeholder="2024" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/></div>
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">Article Type</label>
+    <button onclick="toggleFilters()" class="text-sm text-gray-600 hover:text-gray-900">⚙ Filters <span id="fa">▼</span></button>
+    <div id="filterBox" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">From year</label>
+        <input id="yearFrom" type="number" placeholder="2020" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">To year</label>
+        <input id="yearTo" type="number" placeholder="2024" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Article Type</label>
         <select id="artType" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">All</option><option>Clinical Trial</option><option>Meta-Analysis</option><option>Review</option><option>Systematic Review</option>
-        </select></div>
-      <div><label class="block text-xs font-medium text-gray-600 mb-1">Language</label>
+          <option value="">All</option>
+          <option value="Clinical Trial[pt]">Clinical Trial</option>
+          <option value="Meta-Analysis[pt]">Meta-Analysis</option>
+          <option value="Review[pt]">Review</option>
+          <option value="Systematic Review[pt]">Systematic Review</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Language</label>
         <select id="lang" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">All</option><option>English</option><option>Spanish</option><option>French</option>
-        </select></div>
+          <option value="">All</option>
+          <option value="english[lang]">English</option>
+          <option value="spanish[lang]">Spanish</option>
+          <option value="french[lang]">French</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -52,7 +67,7 @@
   <div id="errBox" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm"></div>
 
   <!-- Loading -->
-  <div id="loadBox" class="hidden bg-white rounded-xl shadow p-8 text-center">
+  <div id="loadBox" class="hidden bg-white rounded-xl shadow p-10 text-center">
     <div class="spinner mx-auto mb-3"></div>
     <p id="loadMsg" class="text-gray-500 text-sm">Loading…</p>
   </div>
@@ -60,125 +75,128 @@
   <!-- Tabs -->
   <div id="tabArea" class="hidden bg-white rounded-xl shadow overflow-hidden">
     <div class="flex border-b">
-      <button id="tab-search"  onclick="showTab('search')"  class="px-5 py-3 font-medium text-sm border-b-2 border-blue-600 text-blue-600">Search</button>
-      <button id="tab-trends"  onclick="showTab('trends')"  class="px-5 py-3 font-medium text-sm text-gray-500 hover:text-gray-800">Trends</button>
-      <button id="tab-impact"  onclick="showTab('impact')"  class="px-5 py-3 font-medium text-sm text-gray-500 hover:text-gray-800">Altmetric &amp; Impact</button>
+      <button id="tab-search" onclick="showTab('search')" class="px-5 py-3 font-medium text-sm border-b-2 border-blue-600 text-blue-600">Search</button>
+      <button id="tab-trends" onclick="showTab('trends')" class="px-5 py-3 font-medium text-sm text-gray-500 hover:text-gray-800">Trends</button>
+      <button id="tab-impact" onclick="showTab('impact')" class="px-5 py-3 font-medium text-sm text-gray-500 hover:text-gray-800">Impact</button>
     </div>
-    <div id="pane-search"  class="p-6"></div>
-    <div id="pane-trends"  class="p-6 hidden"></div>
-    <div id="pane-impact"  class="p-6 hidden"></div>
+    <div id="pane-search" class="p-6"></div>
+    <div id="pane-trends" class="p-6 hidden"></div>
+    <div id="pane-impact" class="p-6 hidden"></div>
   </div>
 
 </div>
-
 <script>
-let filtersOpen = false;
-let selectedPmids = [];
-let allArticles = [];
+/* ── State ── */
+let allArticles = [], selectedPmids = [], filtersOpen = false;
 
-function toggleFilters() {
-  filtersOpen = !filtersOpen;
-  document.getElementById('filters').classList.toggle('hidden', !filtersOpen);
-}
-
-function showTab(name) {
-  ['search','trends','impact'].forEach(t => {
-    document.getElementById('pane-'+t).classList.toggle('hidden', t !== name);
-    const btn = document.getElementById('tab-'+t);
-    btn.className = t === name
-      ? 'px-5 py-3 font-medium text-sm border-b-2 border-blue-600 text-blue-600'
-      : 'px-5 py-3 font-medium text-sm text-gray-500 hover:text-gray-800';
-  });
-}
-
-function showErr(msg) {
-  const b = document.getElementById('errBox');
-  b.textContent = msg; b.classList.remove('hidden');
-}
-function hideErr() { document.getElementById('errBox').classList.add('hidden'); }
-function showLoad(msg) {
-  document.getElementById('loadMsg').textContent = msg || 'Loading…';
-  document.getElementById('loadBox').classList.remove('hidden');
-}
+/* ── UI helpers ── */
+function showErr(m) { const b=document.getElementById('errBox'); b.textContent=m; b.classList.remove('hidden'); }
+function hideErr()  { document.getElementById('errBox').classList.add('hidden'); }
+function showLoad(m){ document.getElementById('loadMsg').textContent=m||'Loading…'; document.getElementById('loadBox').classList.remove('hidden'); }
 function hideLoad() { document.getElementById('loadBox').classList.add('hidden'); }
-
-async function callClaude(prompt, isArray) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 6000,
-      system: "You are a JSON API. Your response must begin with [ or { and contain only valid JSON. Never include text, explanations, or markdown before or after the JSON.",
-      messages: [{ role: "user", content: prompt }]
-    })
+function toggleFilters() {
+  filtersOpen=!filtersOpen;
+  document.getElementById('filterBox').classList.toggle('hidden',!filtersOpen);
+  document.getElementById('fa').textContent=filtersOpen?'▲':'▼';
+}
+function showTab(name) {
+  ['search','trends','impact'].forEach(t=>{
+    document.getElementById('pane-'+t).classList.toggle('hidden',t!==name);
+    const b=document.getElementById('tab-'+t);
+    b.className=t===name?'px-5 py-3 font-medium text-sm border-b-2 border-blue-600 text-blue-600':'px-5 py-3 font-medium text-sm text-gray-500 hover:text-gray-800';
   });
-  if (!res.ok) throw new Error("API error " + res.status);
-  const d = await res.json();
-  let text = d.content?.find(i => i.type === "text")?.text || "";
-  // Aggressively clean the response
-  text = text
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .replace(/^[^[{]*/s, "")  // remove anything before first [ or {
-    .trim();
-  // Find the outermost JSON structure
-  const start = isArray ? text.indexOf("[") : text.indexOf("{");
-  if (start === -1) throw new Error("Invalid JSON response");
-  let depth = 0, end = -1;
-  const open = isArray ? "[" : "{";
-  const close = isArray ? "]" : "}";
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === open)  depth++;
-    if (text[i] === close) depth--;
-    if (depth === 0) { end = i; break; }
-  }
-  if (end === -1) throw new Error("Incomplete JSON response");
-  return JSON.parse(text.slice(start, end + 1));
 }
 
+/* ── PubMed E-utilities (public, no API key needed, CORS-friendly) ── */
+const EBASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+
+function buildQuery() {
+  const q   = document.getElementById('query').value.trim();
+  const yf  = document.getElementById('yearFrom').value;
+  const yt  = document.getElementById('yearTo').value;
+  const at  = document.getElementById('artType').value;
+  const ln  = document.getElementById('lang').value;
+  let parts = [q];
+  if (yf || yt) parts.push(`("${yf||'1900'}"[PDAT]:"${yt||'3000'}"[PDAT])`);
+  if (at) parts.push(at);
+  if (ln) parts.push(ln);
+  return parts.join(' AND ');
+}
+
+async function fetchPmids(term, retmax=20) {
+  const url = `${EBASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(term)}&retmax=${retmax}&retmode=json`;
+  const r = await fetch(url);
+  const d = await r.json();
+  return { ids: d.esearchresult.idlist, count: parseInt(d.esearchresult.count||0) };
+}
+
+async function fetchSummaries(ids) {
+  if (!ids.length) return [];
+  const url = `${EBASE}/esummary.fcgi?db=pubmed&id=${ids.join(',')}&retmode=json`;
+  const r = await fetch(url);
+  const d = await r.json();
+  return ids.map(id => {
+    const s = d.result[id] || {};
+    const authors = (s.authors||[]).map(a=>a.name).join(', ');
+    const journal = s.source || '';
+    const year    = (s.pubdate||'').slice(0,4);
+    const doi     = (s.articleids||[]).find(x=>x.idtype==='doi')?.value || '';
+    const types   = (s.pubtype||[]).join(', ') || 'Article';
+    return { pmid:id, title:s.title||'', authors, journal, year, doi, type:types, abstract:'' };
+  });
+}
+
+async function fetchAbstracts(ids) {
+  if (!ids.length) return {};
+  const url = `${EBASE}/efetch.fcgi?db=pubmed&id=${ids.join(',')}&rettype=abstract&retmode=xml`;
+  const r   = await fetch(url);
+  const txt = await r.text();
+  const parser = new DOMParser();
+  const xml    = parser.parseFromString(txt,'text/xml');
+  const out    = {};
+  xml.querySelectorAll('PubmedArticle').forEach(art=>{
+    const pmid = art.querySelector('PMID')?.textContent;
+    const abs  = art.querySelector('AbstractText')?.textContent || '';
+    if (pmid) out[pmid] = abs;
+  });
+  return out;
+}
+
+/* ── Search ── */
 async function doSearch() {
   const q = document.getElementById('query').value.trim();
-  if (!q) { showErr("Please enter a search term"); return; }
-  hideErr(); showLoad("Searching PubMed…");
+  if (!q) { showErr('Please enter a search term'); return; }
+  hideErr(); showLoad('Searching PubMed…');
   document.getElementById('tabArea').classList.add('hidden');
-  let f = "";
-  const yf = document.getElementById('yearFrom').value;
-  const yt = document.getElementById('yearTo').value;
-  const at = document.getElementById('artType').value;
-  const ln = document.getElementById('lang').value;
-  if (yf) f += ` From year ${yf}.`;
-  if (yt) f += ` To year ${yt}.`;
-  if (at) f += ` Type: ${at}.`;
-  if (ln) f += ` Language: ${ln}.`;
   try {
-    const data = await callClaude(
-      `[{"pmid":"12345","title":"Example title about ${q}","authors":"Smith J, Jones A","journal":"Nature","year":"2023","abstract":"Brief summary.","doi":"10.1000/example","type":"Review"}]
-Generate 15 real PubMed articles about "${q}"${f} in this exact JSON array format. Replace the example with real articles.`, true);
-    allArticles = data;
-    selectedPmids = [];
-    renderArticles(data);
+    const term = buildQuery();
+    const { ids, count } = await fetchPmids(term, 20);
+    if (!ids.length) { showErr('No results found. Try different search terms.'); hideLoad(); return; }
+    const articles = await fetchSummaries(ids);
+    const abstracts = await fetchAbstracts(ids);
+    articles.forEach(a => { a.abstract = abstracts[a.pmid] || ''; });
+    allArticles = articles; selectedPmids = [];
+    renderArticles(articles, count);
     document.getElementById('tabArea').classList.remove('hidden');
     showTab('search');
-  } catch(e) { showErr("Search failed: " + e.message); }
+  } catch(e) { showErr('Search failed: ' + e.message); }
   hideLoad();
 }
 
-function renderArticles(articles) {
+function renderArticles(articles, total) {
   const pane = document.getElementById('pane-search');
-  if (!articles.length) { pane.innerHTML = '<p class="text-gray-400 text-center py-16">No results found.</p>'; return; }
   pane.innerHTML = `
     <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-gray-900">Results (${articles.length})</h2>
+      <h2 class="font-semibold text-gray-900">Results (${articles.length} of ${(total||articles.length).toLocaleString()} total)</h2>
       <button onclick="openExport()" id="exportBtn" class="hidden bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Export selected</button>
     </div>
     <div class="space-y-3" id="articleList"></div>`;
   const list = document.getElementById('articleList');
-  articles.forEach((a, idx) => {
+  articles.forEach((a,idx) => {
     const div = document.createElement('div');
-    div.className = 'border rounded-lg p-4 cursor-pointer transition border-gray-200 hover:border-gray-300';
-    div.id = 'art-' + idx;
-    div.innerHTML = `
+    div.className='border rounded-lg p-4 cursor-pointer transition border-gray-200 hover:border-gray-300';
+    div.id='art-'+idx;
+    div.innerHTML=`
       <div class="flex justify-between mb-2">
         <div class="flex-1">
           <span class="text-xs font-semibold text-blue-600">PMID: ${a.pmid}</span>
@@ -187,204 +205,194 @@ function renderArticles(articles) {
         <input type="checkbox" class="h-5 w-5 mt-1 ml-3" id="chk-${idx}"/>
       </div>
       <div class="grid grid-cols-2 gap-1 text-xs text-gray-600">
-        <div><b>Authors:</b> ${a.authors}</div>
-        <div><b>Year:</b> ${a.year}</div>
-        <div><b>Journal:</b> ${a.journal}</div>
-        <div><b>Type:</b> ${a.type}</div>
+        <div><b>Authors:</b> ${a.authors||'N/A'}</div>
+        <div><b>Year:</b> ${a.year||'N/A'}</div>
+        <div><b>Journal:</b> ${a.journal||'N/A'}</div>
+        <div><b>Type:</b> ${a.type||'N/A'}</div>
       </div>
-      ${a.abstract ? `<p class="mt-2 text-xs text-gray-500 border-t pt-2">${a.abstract.slice(0,220)}…</p>` : ''}`;
-    div.onclick = () => toggleSelect(idx, a.pmid);
+      ${a.abstract?`<p class="mt-2 text-xs text-gray-500 border-t pt-2">${a.abstract.slice(0,240)}…</p>`:''}`;
+    div.onclick=()=>toggleSelect(idx,a.pmid);
     list.appendChild(div);
   });
 }
 
-function toggleSelect(idx, pmid) {
-  const chk = document.getElementById('chk-'+idx);
-  const div = document.getElementById('art-'+idx);
+function toggleSelect(idx,pmid) {
+  const chk=document.getElementById('chk-'+idx);
+  const div=document.getElementById('art-'+idx);
   if (selectedPmids.includes(pmid)) {
-    selectedPmids = selectedPmids.filter(p => p !== pmid);
-    chk.checked = false;
-    div.classList.remove('border-blue-500','bg-blue-50');
-    div.classList.add('border-gray-200');
+    selectedPmids=selectedPmids.filter(p=>p!==pmid);
+    chk.checked=false; div.classList.remove('border-blue-500','bg-blue-50'); div.classList.add('border-gray-200');
   } else {
-    selectedPmids.push(pmid);
-    chk.checked = true;
-    div.classList.add('border-blue-500','bg-blue-50');
-    div.classList.remove('border-gray-200');
+    selectedPmids.push(pmid); chk.checked=true; div.classList.add('border-blue-500','bg-blue-50'); div.classList.remove('border-gray-200');
   }
-  const btn = document.getElementById('exportBtn');
-  if (btn) {
-    btn.classList.toggle('hidden', selectedPmids.length === 0);
-    btn.textContent = `Export ${selectedPmids.length} selected`;
-  }
+  const btn=document.getElementById('exportBtn');
+  if (btn) { btn.classList.toggle('hidden',!selectedPmids.length); btn.textContent=`Export ${selectedPmids.length} selected`; }
 }
 
+/* ── Trends (computed from PubMed year-by-year counts) ── */
 async function doTrends() {
   const q = document.getElementById('query').value.trim();
-  if (!q) { showErr("Enter a search term first"); return; }
-  hideErr(); showLoad("Analyzing trends…");
+  if (!q) { showErr('Enter a search term first'); return; }
+  hideErr(); showLoad('Analyzing trends…');
   document.getElementById('tabArea').classList.remove('hidden');
   showTab('trends');
-  document.getElementById('pane-trends').innerHTML = '<div class="text-center py-16 text-gray-500">Analyzing…</div>';
+  document.getElementById('pane-trends').innerHTML='<div class="text-center py-16 text-gray-400">Analyzing…</div>';
   try {
-    const data = await callClaude(
-      `{"summary":"Overview of ${q} research","publicationsByYear":[{"year":2024,"count":300}],"topAreas":[{"area":"Example area","percentage":30}],"topAuthors":[{"name":"Author Name","institution":"University","publications":20}],"emergingTrends":[{"trend":"Example trend","growth":"+25%"}]}
-Generate real trend data for PubMed research on "${q}" in this exact JSON format. Include 10 years in publicationsByYear, 5 topAreas, 5 topAuthors, 4 emergingTrends.`, false);
-    renderTrends(data);
-  } catch(e) { showErr("Trends failed: " + e.message); }
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({length:10},(_,i)=>currentYear-9+i);
+    const counts = await Promise.all(years.map(async yr=>{
+      const term = `${q} AND ("${yr}"[PDAT]:"${yr}"[PDAT])`;
+      const url  = `${EBASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(term)}&retmax=0&retmode=json`;
+      const r    = await fetch(url);
+      const d    = await r.json();
+      return { year:yr, count:parseInt(d.esearchresult.count||0) };
+    }));
+    // Also get top articles to show titles/journals
+    const { ids } = await fetchPmids(q, 5);
+    const top5 = await fetchSummaries(ids);
+    renderTrends(counts, top5, q);
+  } catch(e) { showErr('Trends failed: '+e.message); }
   hideLoad();
 }
 
-function renderTrends(d) {
-  const max = Math.max(...(d.publicationsByYear||[]).map(i=>i.count), 1);
-  const bars = (d.publicationsByYear||[]).map(item => `
+function renderTrends(counts, top5, q) {
+  const max = Math.max(...counts.map(i=>i.count),1);
+  const bars = counts.map(item=>`
     <div class="flex items-center gap-3">
       <div class="w-12 text-sm text-gray-600 font-medium">${item.year}</div>
       <div class="flex-1 bg-gray-200 rounded-full h-7">
-        <div class="bg-blue-600 h-7 rounded-full flex items-center justify-end pr-2 bar"
-          style="width:${Math.max((item.count/max)*100,4)}%">
-          <span class="text-white text-xs font-medium">${item.count}</span>
+        <div class="bg-blue-600 h-7 rounded-full flex items-center justify-end pr-2 bar" style="width:${Math.max((item.count/max)*100,2)}%">
+          <span class="text-white text-xs font-medium">${item.count.toLocaleString()}</span>
         </div>
       </div>
     </div>`).join('');
 
-  const areas = (d.topAreas||[]).map(a=>`
-    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-      <span class="text-sm text-gray-900">${a.area}</span>
-      <span class="text-blue-600 font-semibold text-sm">${a.percentage}%</span>
-    </div>`).join('');
+  const total = counts.reduce((s,i)=>s+i.count,0);
+  const first = counts[0]?.count || 0;
+  const last  = counts[counts.length-1]?.count || 0;
+  const trend = last > first ? `↑ Growing (+${Math.round((last-first)/Math.max(first,1)*100)}% over 10 years)` : `↓ Declining`;
 
-  const authors = (d.topAuthors||[]).map(a=>`
+  const topJournals = {};
+  top5.forEach(a=>{ if(a.journal) topJournals[a.journal]=(topJournals[a.journal]||0)+1; });
+
+  const recentArticles = top5.map(a=>`
     <div class="p-3 bg-gray-50 rounded-lg">
-      <div class="font-medium text-gray-900 text-sm">${a.name}</div>
-      <div class="text-xs text-gray-500">${a.institution}</div>
-      <div class="text-xs text-blue-600">${a.publications} publications</div>
+      <div class="font-medium text-gray-900 text-sm">${a.title}</div>
+      <div class="text-xs text-gray-500 mt-0.5">${a.authors} · ${a.journal} · ${a.year}</div>
     </div>`).join('');
 
-  const trends = (d.emergingTrends||[]).map(t=>`
-    <div class="p-3 bg-green-50 border border-green-200 rounded-lg flex justify-between items-start">
-      <span class="text-sm text-gray-900 flex-1">${t.trend}</span>
-      <span class="text-green-700 font-semibold text-sm ml-3">${t.growth}</span>
-    </div>`).join('');
-
-  document.getElementById('pane-trends').innerHTML = `
+  document.getElementById('pane-trends').innerHTML=`
     <div class="space-y-6">
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 class="font-semibold text-blue-900 mb-1">Executive Summary</h3>
-        <p class="text-blue-800 text-sm">${d.summary}</p>
+        <h3 class="font-semibold text-blue-900 mb-1">Research Overview: "${q}"</h3>
+        <p class="text-blue-800 text-sm">${total.toLocaleString()} total publications in the last 10 years. ${trend}.</p>
       </div>
-      <div><h3 class="font-semibold text-gray-900 mb-3">📊 Publications Over Time</h3><div class="space-y-2">${bars}</div></div>
-      ${areas ? `<div><h3 class="font-semibold text-gray-900 mb-3">Top Research Areas</h3><div class="space-y-2">${areas}</div></div>` : ''}
-      ${authors ? `<div><h3 class="font-semibold text-gray-900 mb-3">👥 Top Authors</h3><div class="space-y-2">${authors}</div></div>` : ''}
-      ${trends ? `<div><h3 class="font-semibold text-gray-900 mb-3">📈 Emerging Trends</h3><div class="space-y-2">${trends}</div></div>` : ''}
+      <div>
+        <h3 class="font-semibold text-gray-900 mb-3">📊 Publications Per Year (Real PubMed Data)</h3>
+        <div class="space-y-2">${bars}</div>
+      </div>
+      ${recentArticles?`<div><h3 class="font-semibold text-gray-900 mb-3">📄 Most Recent Articles</h3><div class="space-y-2">${recentArticles}</div></div>`:''}
     </div>`;
 }
 
+/* ── Impact (Semantic Scholar public API) ── */
 async function doImpact() {
   const q = document.getElementById('query').value.trim();
-  if (!q) { showErr("Enter a search term first"); return; }
-  hideErr(); showLoad("Loading Altmetric & Semantic Scholar data…");
+  if (!q) { showErr('Enter a search term first'); return; }
+  hideErr(); showLoad('Loading impact data from Semantic Scholar…');
   document.getElementById('tabArea').classList.remove('hidden');
   showTab('impact');
-  document.getElementById('pane-impact').innerHTML = '<div class="text-center py-16 text-gray-500">Loading…</div>';
+  document.getElementById('pane-impact').innerHTML='<div class="text-center py-16 text-gray-400">Loading…</div>';
   try {
-    const data = await callClaude(
-      `{"topPapers":[{"pmid":"12345","title":"Example paper about ${q}","authors":"Smith J","year":"2023","doi":"10.1000/ex","altmetric":{"score":150,"breakdown":{"news":5,"blogs":3,"twitter":100,"facebook":20,"wikipedia":1,"policy":1},"trend":"rising"},"semanticScholar":{"citations":200,"influentialCitations":15,"citationsPerYear":66,"relatedAuthors":[{"name":"Jane Doe","papers":10,"affiliation":"MIT"}],"influentialPapers":[{"title":"Key paper","year":"2021","citations":400}]}}],"fieldOverview":{"totalCitations":5000,"avgAltmetricScore":80,"topCountries":[{"country":"USA","papers":200}],"openAccessPercentage":60}}
-Generate real Altmetric and Semantic Scholar data for 5 top papers about "${q}" in this exact JSON format.`, false);
-    renderImpact(data);
-  } catch(e) { showErr("Impact failed: " + e.message); }
+    // Semantic Scholar public API - no key needed, CORS-friendly
+    const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(q)}&limit=5&fields=title,authors,year,citationCount,influentialCitationCount,publicationVenue,externalIds,openAccessPdf`;
+    const r   = await fetch(url);
+    if (!r.ok) throw new Error('Semantic Scholar API error ' + r.status);
+    const d   = await r.json();
+    renderImpact(d.data || [], q);
+  } catch(e) { showErr('Impact failed: '+e.message); }
   hideLoad();
 }
 
-function altColor(score) {
-  if (score > 200) return '#ef4444';
-  if (score > 100) return '#f97316';
-  if (score > 50)  return '#eab308';
-  return '#3b82f6';
-}
+function renderImpact(papers, q) {
+  if (!papers.length) { document.getElementById('pane-impact').innerHTML='<div class="text-center py-16 text-gray-400">No impact data found.</div>'; return; }
 
-function renderImpact(d) {
-  const ov = d.fieldOverview || {};
-  const overview = `
+  const totalCites = papers.reduce((s,p)=>s+(p.citationCount||0),0);
+  const avgCites   = Math.round(totalCites/papers.length);
+  const overview   = `
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       ${[
-        {l:"Total Citations", v: (ov.totalCitations||0).toLocaleString()},
-        {l:"Avg Altmetric",   v: ov.avgAltmetricScore||0},
-        {l:"Open Access",     v: (ov.openAccessPercentage||0)+"%"},
-        {l:"Top Country",     v: (ov.topCountries||[])[0]?.country||"N/A"},
+        {l:'Papers Found',    v:papers.length},
+        {l:'Total Citations', v:totalCites.toLocaleString()},
+        {l:'Avg Citations',   v:avgCites},
+        {l:'Source',         v:'Semantic Scholar'},
       ].map(i=>`<div class="bg-gray-50 border rounded-lg p-4 text-center">
         <div class="text-2xl font-bold text-blue-600">${i.v}</div>
         <div class="text-xs text-gray-500 mt-1">${i.l}</div>
       </div>`).join('')}
     </div>`;
 
-  const papers = (d.topPapers||[]).map(p => {
-    const alt = p.altmetric || {};
-    const ss  = p.semanticScholar || {};
-    const bkd = Object.entries(alt.breakdown||{}).map(([k,v])=>`
-      <div class="bg-white rounded p-1.5 text-center">
-        <div class="text-sm font-bold text-gray-800">${v}</div>
-        <div class="text-xs text-gray-500 capitalize">${k}</div>
-      </div>`).join('');
-    const relAuth = (ss.relatedAuthors||[]).map(a=>`
-      <div class="text-xs text-gray-700 flex justify-between bg-white rounded px-2 py-1 mb-1">
-        <span class="font-medium">${a.name}</span>
-        <span class="text-blue-600">${a.papers} papers</span>
-      </div>`).join('');
-    const inflPapers = (ss.influentialPapers||[]).map(ip=>`
-      <div class="text-xs text-gray-700 bg-white rounded px-2 py-1 mb-1">
-        <span class="font-medium">${ip.title}</span>
-        <span class="text-gray-400 ml-2">(${ip.year}) · ${ip.citations} cites</span>
-      </div>`).join('');
+  const cards = papers.map(p=>{
+    const authors  = (p.authors||[]).slice(0,3).map(a=>a.name).join(', ') + (p.authors?.length>3?' et al.':'');
+    const doi      = p.externalIds?.DOI || '';
+    const pmid     = p.externalIds?.PubMed || '';
+    const openAccess = p.openAccessPdf?.url ? `<a href="${p.openAccessPdf.url}" target="_blank" class="text-xs text-green-600 font-medium">🔓 Open Access PDF</a>` : '<span class="text-xs text-gray-400">🔒 Subscription required</span>';
+    const infPct   = p.citationCount ? Math.round((p.influentialCitationCount||0)/p.citationCount*100) : 0;
     return `
       <div class="border-2 border-gray-100 rounded-xl p-5 mb-4">
-        <span class="text-xs text-blue-600 font-semibold">PMID: ${p.pmid} · ${p.year}</span>
-        <h4 class="font-semibold text-gray-900 mt-1">${p.title}</h4>
-        <p class="text-xs text-gray-500 mt-0.5 mb-3">${p.authors}</p>
+        <div class="mb-3">
+          ${pmid?`<span class="text-xs text-blue-600 font-semibold">PMID: ${pmid} · </span>`:''}
+          <span class="text-xs text-gray-500">${p.year||'N/A'}</span>
+          <h4 class="font-semibold text-gray-900 mt-1">${p.title||''}</h4>
+          <p class="text-xs text-gray-500 mt-0.5">${authors}</p>
+          <p class="text-xs text-gray-400 mt-0.5">${p.publicationVenue?.name||''}</p>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-3">
-              <h5 class="font-semibold text-orange-900 text-sm">Altmetric Score</h5>
-              <div style="background:${altColor(alt.score)}" class="text-white text-xl font-bold w-12 h-12 rounded-full flex items-center justify-center">${alt.score}</div>
-            </div>
-            <div class="grid grid-cols-3 gap-2">${bkd}</div>
-            <div class="mt-2 text-xs text-orange-700 font-medium text-right">
-              ${alt.trend==='rising'?'📈 Trending up':alt.trend==='stable'?'➡ Stable':'📉 Declining'}
-            </div>
-          </div>
           <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-            <h5 class="font-semibold text-blue-900 text-sm mb-3">Semantic Scholar</h5>
+            <h5 class="font-semibold text-blue-900 text-sm mb-3">Semantic Scholar Metrics</h5>
             <div class="grid grid-cols-3 gap-2 text-center mb-3">
-              ${[{l:"Citations",v:ss.citations},{l:"Influential",v:ss.influentialCitations},{l:"Per Year",v:ss.citationsPerYear}].map(m=>`
-              <div class="bg-white rounded p-1.5">
+              ${[
+                {l:'Citations',   v:(p.citationCount||0).toLocaleString()},
+                {l:'Influential', v:(p.influentialCitationCount||0)},
+                {l:'Infl. %',     v:infPct+'%'},
+              ].map(m=>`<div class="bg-white rounded p-1.5">
                 <div class="text-sm font-bold text-gray-800">${m.v}</div>
                 <div class="text-xs text-gray-500">${m.l}</div>
               </div>`).join('')}
             </div>
-            ${relAuth ? `<p class="text-xs font-semibold text-blue-800 mb-1">👥 Related Authors</p>${relAuth}` : ''}
-            ${inflPapers ? `<p class="text-xs font-semibold text-blue-800 mb-1 mt-2">📄 Influential Papers</p>${inflPapers}` : ''}
+            <div class="mt-2">${openAccess}</div>
+            ${doi?`<div class="mt-1"><a href="https://doi.org/${doi}" target="_blank" class="text-xs text-blue-600 hover:underline">DOI: ${doi}</a></div>`:''}
+          </div>
+          <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4">
+            <h5 class="font-semibold text-orange-900 text-sm mb-2">Altmetric</h5>
+            <p class="text-xs text-gray-600 mb-3">Real-time Altmetric scores require an institutional API key. View directly on Altmetric.com:</p>
+            ${doi?`<a href="https://www.altmetric.com/details/${doi}" target="_blank"
+              class="inline-block bg-orange-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-orange-600">
+              View Altmetric Score ↗
+            </a>`:'<span class="text-xs text-gray-400">DOI not available</span>'}
           </div>
         </div>
       </div>`;
   }).join('');
 
   document.getElementById('pane-impact').innerHTML = overview +
-    '<h3 class="font-semibold text-gray-900 text-lg mb-4">Top Papers by Impact</h3>' + papers;
+    `<h3 class="font-semibold text-gray-900 text-lg mb-4">Top Papers by Citation Count</h3>` + cards;
 }
 
+/* ── Export ── */
 function openExport() {
-  const sel = allArticles.filter(a => selectedPmids.includes(a.pmid));
-  const fmt = prompt("Format? Type: APA, Vancouver, or MLA", "APA") || "APA";
-  const lines = sel.map(a => {
-    const auth = (a.authors||"").split(",")[0].trim() + " et al.";
-    if (fmt === "APA")       return `${auth} (${a.year}). ${a.title}. ${a.journal}. ${a.doi?"https://doi.org/"+a.doi:"PMID: "+a.pmid}`;
-    if (fmt === "Vancouver") return `${auth}. ${a.title}. ${a.journal}. ${a.year}. PMID: ${a.pmid}`;
+  const sel = allArticles.filter(a=>selectedPmids.includes(a.pmid));
+  const fmt = prompt('Format? APA, Vancouver, or MLA','APA')||'APA';
+  const lines = sel.map(a=>{
+    const auth=(a.authors||'').split(',')[0].trim()+' et al.';
+    if (fmt==='APA')       return `${auth} (${a.year}). ${a.title}. ${a.journal}. ${a.doi?'https://doi.org/'+a.doi:'PMID: '+a.pmid}`;
+    if (fmt==='Vancouver') return `${auth}. ${a.title}. ${a.journal}. ${a.year}. PMID: ${a.pmid}`;
     return `${auth} "${a.title}." ${a.journal} (${a.year}).`;
   });
-  const blob = new Blob([lines.join("\n\n")], {type:"text/plain"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "bibliography.txt"; a.click();
+  const blob=new Blob([lines.join('\n\n')],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='bibliography.txt'; a.click();
   URL.revokeObjectURL(url);
 }
 </script>
