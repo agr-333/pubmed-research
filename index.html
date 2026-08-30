@@ -117,7 +117,7 @@ export default function PubMedTool() {
 
         <div className="bg-white rounded-xl shadow p-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-1">PubMed Research Trends</h1>
-          <p className="text-gray-500 text-sm">Search scientific literature · Analyze trends · Measure impact with Altmetric & Semantic Scholar</p>
+          <p className="text-gray-500 text-sm">Search scientific literature · Analyze trends · Measure impact with Altmetric &amp; Semantic Scholar</p>
         </div>
 
         <div className="bg-white rounded-xl shadow p-6">
@@ -253,7 +253,6 @@ export default function PubMedTool() {
                     <h3 className="font-semibold text-blue-900 mb-1">Executive Summary</h3>
                     <p className="text-blue-800 text-sm">{trendData.summary}</p>
                   </div>
-
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <BarChart3 size={18} />Publications Over Time
@@ -275,7 +274,6 @@ export default function PubMedTool() {
                       })}
                     </div>
                   </div>
-
                   {trendData.topAreas?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-3">Top Research Areas</h3>
@@ -289,7 +287,6 @@ export default function PubMedTool() {
                       </div>
                     </div>
                   )}
-
                   {trendData.topAuthors?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -306,7 +303,6 @@ export default function PubMedTool() {
                       </div>
                     </div>
                   )}
-
                   {trendData.emergingTrends?.length > 0 && (
                     <div>
                       <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -330,9 +326,9 @@ export default function PubMedTool() {
           {activeTab === "Altmetric & Impact" && (
             <div className="p-6">
               {loadingImpact ? (
-                <div className="text-center py-16 text-gray-500">Loading Altmetric & Semantic Scholar data…</div>
+                <div className="text-center py-16 text-gray-500">Loading Altmetric &amp; Semantic Scholar data…</div>
               ) : !impactData ? (
-                <div className="text-center py-16 text-gray-400">Click "Impact" to load Altmetric & Semantic Scholar data</div>
+                <div className="text-center py-16 text-gray-400">Click "Impact" to load Altmetric &amp; Semantic Scholar data</div>
               ) : (
                 <div className="space-y-6">
                   {impactData.fieldOverview && (
@@ -350,9 +346,7 @@ export default function PubMedTool() {
                       ))}
                     </div>
                   )}
-
                   <h3 className="font-semibold text-gray-900 text-lg">Top Papers by Impact</h3>
-
                   {(impactData.topPapers || []).map((paper, i) => (
                     <div key={i} className="border-2 border-gray-100 rounded-xl p-5 space-y-4">
                       <div>
@@ -360,7 +354,6 @@ export default function PubMedTool() {
                         <h4 className="font-semibold text-gray-900 mt-1">{paper.title}</h4>
                         <p className="text-xs text-gray-500 mt-0.5">{paper.authors}</p>
                       </div>
-
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {paper.altmetric && (
                           <div className="bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-4">
@@ -383,7 +376,6 @@ export default function PubMedTool() {
                             </div>
                           </div>
                         )}
-
                         {paper.semanticScholar && (
                           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
                             <h5 className="font-semibold text-blue-900 text-sm mb-3">Semantic Scholar</h5>
@@ -399,7 +391,6 @@ export default function PubMedTool() {
                                 </div>
                               ))}
                             </div>
-
                             {paper.semanticScholar.relatedAuthors?.length > 0 && (
                               <div className="mb-2">
                                 <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1">
@@ -413,7 +404,6 @@ export default function PubMedTool() {
                                 ))}
                               </div>
                             )}
-
                             {paper.semanticScholar.influentialPapers?.length > 0 && (
                               <div>
                                 <p className="text-xs font-semibold text-blue-800 mb-1 flex items-center gap-1">
