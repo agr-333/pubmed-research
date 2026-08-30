@@ -109,17 +109,32 @@ async function callClaude(prompt, isArray) {
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 6000,
-      system: "You are a JSON API. Respond with ONLY valid JSON. No explanation, no markdown, no code fences.",
+      system: "You are a JSON API. Your response must begin with [ or { and contain only valid JSON. Never include text, explanations, or markdown before or after the JSON.",
       messages: [{ role: "user", content: prompt }]
     })
   });
   if (!res.ok) throw new Error("API error " + res.status);
   const d = await res.json();
   let text = d.content?.find(i => i.type === "text")?.text || "";
-  text = text.replace(/```json/g,"").replace(/```/g,"").trim();
-  const m = isArray ? text.match(/\[[\s\S]*\]/) : text.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("Invalid JSON response");
-  return JSON.parse(m[0]);
+  // Aggressively clean the response
+  text = text
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .replace(/^[^[{]*/s, "")  // remove anything before first [ or {
+    .trim();
+  // Find the outermost JSON structure
+  const start = isArray ? text.indexOf("[") : text.indexOf("{");
+  if (start === -1) throw new Error("Invalid JSON response");
+  let depth = 0, end = -1;
+  const open = isArray ? "[" : "{";
+  const close = isArray ? "]" : "}";
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === open)  depth++;
+    if (text[i] === close) depth--;
+    if (depth === 0) { end = i; break; }
+  }
+  if (end === -1) throw new Error("Incomplete JSON response");
+  return JSON.parse(text.slice(start, end + 1));
 }
 
 async function doSearch() {
@@ -138,8 +153,8 @@ async function doSearch() {
   if (ln) f += ` Language: ${ln}.`;
   try {
     const data = await callClaude(
-      `Return a JSON array of 15 PubMed articles about "${q}".${f} ` +
-      `Schema: [{"pmid":"","title":"","authors":"","journal":"","year":"","abstract":"","doi":"","type":""}]`, true);
+      `[{"pmid":"12345","title":"Example title about ${q}","authors":"Smith J, Jones A","journal":"Nature","year":"2023","abstract":"Brief summary.","doi":"10.1000/example","type":"Review"}]
+Generate 15 real PubMed articles about "${q}"${f} in this exact JSON array format. Replace the example with real articles.`, true);
     allArticles = data;
     selectedPmids = [];
     renderArticles(data);
@@ -213,8 +228,8 @@ async function doTrends() {
   document.getElementById('pane-trends').innerHTML = '<div class="text-center py-16 text-gray-500">Analyzing…</div>';
   try {
     const data = await callClaude(
-      `Return a JSON object with PubMed research trend data for "${q}". ` +
-      `Schema: {"summary":"","publicationsByYear":[{"year":2024,"count":0}],"topAreas":[{"area":"","percentage":0}],"topAuthors":[{"name":"","institution":"","publications":0}],"emergingTrends":[{"trend":"","growth":""}]}`, false);
+      `{"summary":"Overview of ${q} research","publicationsByYear":[{"year":2024,"count":300}],"topAreas":[{"area":"Example area","percentage":30}],"topAuthors":[{"name":"Author Name","institution":"University","publications":20}],"emergingTrends":[{"trend":"Example trend","growth":"+25%"}]}
+Generate real trend data for PubMed research on "${q}" in this exact JSON format. Include 10 years in publicationsByYear, 5 topAreas, 5 topAuthors, 4 emergingTrends.`, false);
     renderTrends(data);
   } catch(e) { showErr("Trends failed: " + e.message); }
   hideLoad();
@@ -274,8 +289,8 @@ async function doImpact() {
   document.getElementById('pane-impact').innerHTML = '<div class="text-center py-16 text-gray-500">Loading…</div>';
   try {
     const data = await callClaude(
-      `Return a JSON object with Altmetric and Semantic Scholar data for 5 top papers about "${q}". ` +
-      `Schema: {"topPapers":[{"pmid":"","title":"","authors":"","year":"","doi":"","altmetric":{"score":0,"breakdown":{"news":0,"blogs":0,"twitter":0,"facebook":0,"wikipedia":0,"policy":0},"trend":"rising"},"semanticScholar":{"citations":0,"influentialCitations":0,"citationsPerYear":0,"relatedAuthors":[{"name":"","papers":0,"affiliation":""}],"influentialPapers":[{"title":"","year":"","citations":0}]}}],"fieldOverview":{"totalCitations":0,"avgAltmetricScore":0,"topCountries":[{"country":"","papers":0}],"openAccessPercentage":0}}`, false);
+      `{"topPapers":[{"pmid":"12345","title":"Example paper about ${q}","authors":"Smith J","year":"2023","doi":"10.1000/ex","altmetric":{"score":150,"breakdown":{"news":5,"blogs":3,"twitter":100,"facebook":20,"wikipedia":1,"policy":1},"trend":"rising"},"semanticScholar":{"citations":200,"influentialCitations":15,"citationsPerYear":66,"relatedAuthors":[{"name":"Jane Doe","papers":10,"affiliation":"MIT"}],"influentialPapers":[{"title":"Key paper","year":"2021","citations":400}]}}],"fieldOverview":{"totalCitations":5000,"avgAltmetricScore":80,"topCountries":[{"country":"USA","papers":200}],"openAccessPercentage":60}}
+Generate real Altmetric and Semantic Scholar data for 5 top papers about "${q}" in this exact JSON format.`, false);
     renderImpact(data);
   } catch(e) { showErr("Impact failed: " + e.message); }
   hideLoad();
